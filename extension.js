@@ -33,7 +33,7 @@
     const sp = new SettingsProvider(settings, settingsApplied);
     const miscSection = sp.addSection("Miscellaneous");
     miscSection.addBoolean("fixHud", "Fix HUD on map edge (needs page reload)");
-    miscSection.addBoolean("keepFiringWhileTyping", "Keep firing while typing");
+    miscSection.addBoolean("keepFiringWhileTyping", "Keep firing while typing (except prowler)");
     miscSection.addString("dropFlagKey", "CTF drop key.");
     miscSection.addBoolean("fixPlayerCount", "Improve CTF team player count");
     miscSection.addBoolean("respawnLines", "Add CTF respawn lines");
@@ -436,7 +436,7 @@
     })
 
     const onWindowKeyDown = (event) => {
-      if (UI.chatBoxOpen() && maybePlaneBinding(event.key)) {
+      if (UI.chatBoxOpen() && maybePlaneBinding(event.key) && Players.getMe().type !== 5) {
         const bind = Input.getBind(event.which);
         if (PLANE_BINDINGS.indexOf(bind)>=0) {
           if (bind === 'FIRE') {
@@ -451,7 +451,7 @@
       }
     }
     const onWindowKeyUp = (event) => {
-      if (UI.chatBoxOpen() && maybePlaneBinding(event.key)) {
+      if (UI.chatBoxOpen() && maybePlaneBinding(event.key) && Players.getMe().type !== 5) {
         const bind = Input.getBind(event.which);
         if (PLANE_BINDINGS.indexOf(bind)>=0) {
           if (bind === 'FIRE') {
@@ -543,7 +543,7 @@
       id: "starmashthings",
       description: "De* collection of Starmash features (see Mod Settings)",
       author: "Debug",
-      version: "1.1",
+      version: "1.1.1",
       settingsProvider: createSettingsProvider()
   });
 
