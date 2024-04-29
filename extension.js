@@ -79,7 +79,7 @@
   SWAM.on("gameRunning",async function () {
 
     const INITIAL_EXTRALATENCY = 0;
-    let lowPings = []
+    let lowPings = {}
 
     const originalPlayersKill = Players.kill
     const originalUIUpdateScore = UI.updateScore;
@@ -88,7 +88,7 @@
     const isBot = player =>
       (
         player.name.indexOf('[bot] ') === 0 &&
-        lowPings.indexOf(player.id) >= 0
+        lowPings[player.id] > 0
       ) ||
       player.team === 128
     const isSpec = player =>
@@ -107,7 +107,9 @@
 
         UI.updateScore = function (On) {
           originalUIUpdateScore(On)
-          lowPings = On.scores.filter(p => p.ping < 10).map(p => p.id)
+          On.scores.forEach(p => {
+            lowPings[p.id] = (lowPings[p.id] || 0) + (p.ping < 10 ? 1 : -1)
+          })
         }
 
         UI.updateStats = function (Bt) { // same code from engine.js
@@ -548,7 +550,7 @@
       id: "starmashthings",
       description: "De* collection of Starmash features (see Mod Settings)",
       author: "Debug",
-      version: "1.1.3",
+      version: "1.1.4",
       settingsProvider: createSettingsProvider()
   });
 
