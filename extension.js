@@ -85,9 +85,14 @@
     const originalUIUpdateScore = UI.updateScore;
     const originalUIUpdateStats = UI.updateStats;
 
-    const isBot = player => player.name.indexOf('[bot] ') === 0 && lowPings.indexOf(player.id) >= 0
+    const isBot = player =>
+      (
+        player.name.indexOf('[bot] ') === 0 &&
+        lowPings.indexOf(player.id) >= 0
+      ) ||
+      player.team === 128
     const isSpec = player =>
-      player.removedFromMap && (performance.now() - (player.lastKilled || 0)) > 3000
+      player.removedFromMap && (performance.now() - (player.lastKilled || 0)) > 5000
 
     const toggle = (isEnabled) => {
       if (isEnabled) {
@@ -543,7 +548,7 @@
       id: "starmashthings",
       description: "De* collection of Starmash features (see Mod Settings)",
       author: "Debug",
-      version: "1.1.2",
+      version: "1.1.3",
       settingsProvider: createSettingsProvider()
   });
 
