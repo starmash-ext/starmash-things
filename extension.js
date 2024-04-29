@@ -16,7 +16,8 @@
         zoom: 5000,
         squared: false,
       }
-    }
+    },
+    dropFlagKey: 'Y'
   };
 
   // This is the handler that will be executed when new settings are applied
@@ -32,9 +33,10 @@
     const sp = new SettingsProvider(settings, settingsApplied);
     const miscSection = sp.addSection("Miscellaneous");
     miscSection.addBoolean("fixHud", "Fix HUD on map edge (needs page reload)");
-    miscSection.addBoolean("fixPlayerCount", "Improve CTF team player count.");
-    miscSection.addBoolean("respawnLines", "Add CTF respawn lines");
     miscSection.addBoolean("keepFiringWhileTyping", "Keep firing while typing");
+    miscSection.addString("dropFlagKey", "CTF drop key.");
+    miscSection.addBoolean("fixPlayerCount", "Improve CTF team player count");
+    miscSection.addBoolean("respawnLines", "Add CTF respawn lines");
     miscSection.addValuesField("carrier", "Display CTF carrier type",
       {
         "count": "Carrier type and esc/rec count",
@@ -85,7 +87,7 @@
 
     const isBot = player => player.name.indexOf('[bot] ') === 0 && lowPings.indexOf(player.id) >= 0
     const isSpec = player =>
-      player.removedFromMap && (performance.now() - (player.lastKilled || 0)) > 5e3
+      player.removedFromMap && (performance.now() - (player.lastKilled || 0)) > 3000
 
     const toggle = (isEnabled) => {
       if (isEnabled) {
@@ -412,7 +414,6 @@
     })
     onSettingsUpdated('quickResize',(settings) => {
       currentSettingsRef.ref = settings
-      resize(settings)
     })
   })
 
@@ -476,6 +477,32 @@
 
 
   /**
+   * Custom Drop Flag key
+   */
+  SWAM.on("gameRunning", function () {
+    const originalNetworkSendCommand = Network.sendCommand
+    const settingsRef = {ref:settings}
+    const onWindowKeyDown = (event) => {
+      if (!UI.chatBoxOpen() && event.key?.toLowerCase() === settingsRef.ref?.toLowerCase()) {
+        Network.sendCommand("drop","",true)
+      }
+    }
+    $(window).on("keydown", onWindowKeyDown)
+    onSettingsUpdated('dropFlagKey', (key) => {
+      settingsRef.ref = key
+      Network.sendCommand = originalNetworkSendCommand
+      if (key) {
+        Network.sendCommand = (command, value, force) => {
+          if (command === "drop" && !force) { return }
+          originalNetworkSendCommand(command, value)
+        }
+      }
+    })
+  })
+
+
+
+  /**
    *  utils
    */
   function deepEqual(x, y) {
@@ -516,9 +543,8 @@
       id: "starmashthings",
       description: "De* collection of Starmash features (see Mod Settings)",
       author: "Debug",
-      version: "1.0",
+      version: "1.1",
       settingsProvider: createSettingsProvider()
   });
 
 }();
-    
