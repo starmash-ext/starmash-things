@@ -1,8 +1,9 @@
-!function() {
+   !function() {
 
   let settings = {
     fixPlayerCount: true,
     respawnLines: true,
+    respawnLinesMinimap: true,
     fixHud: true,
     keepFiringWhileTyping:true,
     carrier: 'count',
@@ -17,9 +18,11 @@
         squared: false,
       }
     },
-    dropFlagKey: 'Y'
+    dropFlagKey: 'Y',
+    dropUpgKey: ''
   };
-
+  const BLUE_TEAM = 1
+  const RED_TEAM = 2
   // This is the handler that will be executed when new settings are applied
   function settingsApplied(values)
   {
@@ -35,27 +38,29 @@
     miscSection.addBoolean("fixHud", "Fix HUD on map edge (needs page reload)");
     miscSection.addBoolean("keepFiringWhileTyping", "Keep firing while typing (except stealthed prowler)");
     miscSection.addString("dropFlagKey", "CTF drop key.");
+    miscSection.addString("dropUpgKey", "Drop upgrade key.");
     miscSection.addBoolean("fixPlayerCount", "Improve CTF team player count");
     miscSection.addBoolean("respawnLines", "Add CTF respawn lines");
+    miscSection.addBoolean("respawnLinesMinimap", "Add CTF respawn lines to minimap");
     miscSection.addValuesField("carrier", "Display CTF carrier type",
       {
         "count": "Carrier type and esc/rec count",
         "carrier": "Carrier only",
         "none": "Disabled"
-    });
+      });
     const quickResizeSection = sp.addSection("Quick Zoom Resizing");
     quickResizeSection.addString("quickResize.key", "Trigger key for toggle between [A] and [B]");
     quickResizeSection.addSeparator();
     quickResizeSection.addSliderField("quickResize.a.zoom", "[A] Zoom Level", {
-        min: 1500,
-        max: 6e3,
-        step: 500
+      min: 1500,
+      max: 6e3,
+      step: 500
     });
     quickResizeSection.addBoolean("quickResize.a.squared","[A] Use squared game area")
     quickResizeSection.addSliderField("quickResize.b.zoom", "[B] Zoom level", {
-        min: 1500,
-        max: 6e3,
-        step: 500
+      min: 1500,
+      max: 6e3,
+      step: 500
     });
     quickResizeSection.addBoolean("quickResize.b.squared","[B] Use squared game area")
     return sp;
@@ -63,13 +68,15 @@
 
   const onSettingsUpdated = (key,callback) => {
     let previousSettings = settings
+    const keys = [].concat(key)
     SWAM.on("settingsUpdated", (nextSettings) => {
-      if (!deepEqual(previousSettings[key],nextSettings[key])) {
-        callback(nextSettings[key],false)
+
+      if (keys.find(k => !deepEqual(previousSettings[k],nextSettings[k]))) {
+        callback(typeof key === "string" ? nextSettings[key] : Object.fromEntries(keys.map(k => [k,settings[k]])),false)
       }
       previousSettings = nextSettings
     })
-    callback(settings[key],true)
+    callback(typeof key === "string" ? settings[key] : Object.fromEntries(keys.map(k => [k,settings[k]])),true)
   }
 
 
@@ -119,7 +126,7 @@
               , jt = 0;
             forEachPlayer(Wt => {
                 if (!isSpec(Wt) && !isBot(Wt)) { // new code
-                  1 == Wt.team ? Ht++ : jt++
+                  BLUE_TEAM == Wt.team ? Ht++ : jt++
                 }
               }
             ),
@@ -153,10 +160,12 @@
    */
   SWAM.on("gameRunning",async function () {
     const previousGamesPrep = Games.prep;
-    const createSprite = ({color,x,y, height,width}) => {
+    const {height: minimapHeight,width: minimapWidth} = game.graphics.gui.minimap.getLocalBounds()
+
+    const createSprite = ({color,x,y, height,width, alpha = 0.3}) => {
       var sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
       sprite.tint = color; //Change with the color wanted
-      sprite.alpha = 0.3;
+      sprite.alpha = alpha;
       sprite.width = width;
       sprite.height = height;
       sprite.x = x
@@ -164,6 +173,14 @@
       sprite.roundPixels = true
       return sprite
     }
+
+    const minimapOffsetY = 512*minimapHeight/config.mapHeight
+    const minimapOffsetX = 1024*minimapWidth/config.mapWidth
+    const blueXSpawnMinimap = createSprite({color:0x0000FF, x:-minimapWidth/2,y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 0.6})
+    const redXSpawnMinimap = createSprite({color:0xFF0000, x:-minimapOffsetX - (minimapWidth/2),y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 0.6})
+    const blueYSpawnMinimap = createSprite({color:0x0000FF, y:-minimapHeight/2, x:-minimapWidth/2,  width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 0.6})
+    const redYSpawnMinimap = createSprite({color:0xFF0000, y:-minimapOffsetY - minimapHeight/2, x:-minimapOffsetX - minimapWidth,width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 0.6})
+
     const blueXSpawn = createSprite({color:0x0000FF, x:0,y:-config.mapHeight/2, height:config.mapHeight,width:1/game.graphics.layers.groundobjects.scale.x})
     const redXSpawn = createSprite({color:0xFF0000, x:-1024,y:-config.mapHeight/2, height:config.mapHeight,width:1/game.graphics.layers.groundobjects.scale.x})
     const blueYSpawn = createSprite({color:0x0000FF, y:0, x:0,  width:config.mapWidth/2,height:1/game.graphics.layers.groundobjects.scale.y})
@@ -175,19 +192,47 @@
       redYSpawn.height = 1 / game.graphics.layers.groundobjects.scale.y
       blueYSpawn.height = 1 / game.graphics.layers.groundobjects.scale.y
     }
-    const toggle = (isEnabled,firstTime) => {
-      if (isEnabled) {
+    const addMinimap = () => {
+      game.graphics.gui.minimap.addChild(blueXSpawnMinimap)
+      game.graphics.gui.minimap.addChild(redXSpawnMinimap)
+      game.graphics.gui.minimap.addChild(blueYSpawnMinimap)
+      game.graphics.gui.minimap.addChild(redYSpawnMinimap)
+    }
+    const removeMinimap = () => {
+      game.graphics.gui.minimap.removeChild(blueXSpawnMinimap)
+      game.graphics.gui.minimap.removeChild(redXSpawnMinimap)
+      game.graphics.gui.minimap.removeChild(blueYSpawnMinimap)
+      game.graphics.gui.minimap.removeChild(redYSpawnMinimap)
+    }
+    const addMap = () => {
+      game.graphics.layers.groundobjects.addChild(redXSpawn)
+      game.graphics.layers.groundobjects.addChild(blueXSpawn)
+      game.graphics.layers.groundobjects.addChild(redYSpawn)
+      game.graphics.layers.groundobjects.addChild(blueYSpawn)
+    }
+    const removeMap = () => {
+      game.graphics.layers.groundobjects.removeChild(redXSpawn)
+      game.graphics.layers.groundobjects.removeChild(blueXSpawn)
+      game.graphics.layers.groundobjects.removeChild(redYSpawn)
+      game.graphics.layers.groundobjects.removeChild(blueYSpawn)
+    }
+    const toggle = ({respawnLines,respawnLinesMinimap},firstTime) => {
+      if (respawnLines || respawnLinesMinimap) {
         const addRespawnLines = () => {
           if (game.gameType === 2) {
-            game.graphics.layers.groundobjects.addChild(redXSpawn)
-            game.graphics.layers.groundobjects.addChild(blueXSpawn)
-            game.graphics.layers.groundobjects.addChild(redYSpawn)
-            game.graphics.layers.groundobjects.addChild(blueYSpawn)
+            if (respawnLines) {
+              addMap()
+            } else {
+              removeMap()
+            }
+            if (respawnLinesMinimap) {
+              addMinimap()
+            } else {
+              removeMinimap()
+            }
           } else {
-            game.graphics.layers.groundobjects.removeChild(redXSpawn)
-            game.graphics.layers.groundobjects.removeChild(blueXSpawn)
-            game.graphics.layers.groundobjects.removeChild(redYSpawn)
-            game.graphics.layers.groundobjects.removeChild(blueYSpawn)
+            removeMap()
+            removeMinimap()
           }
         }
         Games.prep = () => {
@@ -200,14 +245,12 @@
         SWAM.on("rendererResized", onRenderResized)
       } else {
         Games.prep = previousGamesPrep;
-        game.graphics.layers.groundobjects.removeChild(redXSpawn)
-        game.graphics.layers.groundobjects.removeChild(blueXSpawn)
-        game.graphics.layers.groundobjects.removeChild(redYSpawn)
-        game.graphics.layers.groundobjects.removeChild(blueYSpawn)
+        removeMap()
+        removeMinimap()
         SWAM.off("rendererResized", onRenderResized)
       }
     }
-    onSettingsUpdated('respawnLines', toggle)
+    onSettingsUpdated(['respawnLines','respawnLinesMinimap'], toggle)
   });
 
   /**
@@ -349,6 +392,7 @@
             playerPlane.prepend(bluesClose)
             playerPlane.append(redsClose)
             if (isBlue) {
+              SWAM.trigger("carrierInfo",{plane:player.type,team:BLUE_TEAM})
               blueCarrier = t.id
               playerPlane.style.position = "absolute"
               playerPlane.style.top = "-20px"
@@ -356,6 +400,7 @@
               playerPlane.style.right = "72px"
               element.insertBefore(playerPlane,element.querySelector(".rounds"))
             } else {
+              SWAM.trigger("carrierInfo",{plane:player.type,team:RED_TEAM})
               redCarrier = t.id
               playerPlane.style.position = "absolute"
               playerPlane.style.top = "-20px"
@@ -365,8 +410,10 @@
             }
           } else {
             if (isBlue) {
+              SWAM.trigger("carrierInfo",{plane:null,team:BLUE_TEAM})
               blueCarrier = null
             } else {
+              SWAM.trigger("carrierInfo",{plane:null,team:RED_TEAM})
               redCarrier = null
             }
           }
@@ -374,22 +421,24 @@
 
         const getCloseToCarrier = (player) => {
           const players = Object.keys(Players.getIDs()).map(Players.get).filter(({removedFromMap}) => !removedFromMap)
-            .map(({id,team,lowResPos}) => ({id,team,distance: DISTANCE(lowResPos,player.lowResPos)}))
-          const redTeam = players.filter(({team}) => team === 2)
-          const blueTeam = players.filter(({team}) => team === 1)
-          return [blueTeam.filter(({distance}) => distance < 2500).length, redTeam.filter(({distance}) => distance < 2500).length]
+          .map(({id,team,lowResPos}) => ({id,team,distance: DISTANCE(lowResPos,player.lowResPos)}))
+          const blueTeam = players.filter(({team}) => team === BLUE_TEAM)
+          const redTeam = players.filter(({team}) => team === RED_TEAM)
+          return [blueTeam.filter(({distance}) => distance < 3500).length, redTeam.filter(({distance}) => distance < 3500).length]
         }
         UI.scoreboardUpdate = (t,n,i) => {
           originalUIscoreboardUpdate(t,n,i)
           if (type === 'count') {
             if (blueCarrier) {
               const [bluesClose, redsClose] = getCloseToCarrier(Players.get(blueCarrier))
+              SWAM.trigger("carrierInfo",{plane:Players.get(blueCarrier).type,team: BLUE_TEAM,esc:redsClose-1,rec:bluesClose,hasCount:true})
               document.getElementById("blueflag-name").querySelector(".blues-close").innerText = ` ${bluesClose} `
-              document.getElementById("blueflag-name").querySelector(".reds-close").innerText = ` ${redsClose} `
+              document.getElementById("blueflag-name").querySelector(".reds-close").innerText = ` ${redsClose-1} `
             }
             if (redCarrier) {
               const [bluesClose, redsClose] = getCloseToCarrier(Players.get(redCarrier))
-              document.getElementById("redflag-name").querySelector(".blues-close").innerText = ` ${bluesClose} `
+              SWAM.trigger("carrierInfo",{plane:Players.get(redCarrier).type,team:RED_TEAM,rec:redsClose,esc:bluesClose-1,hasCount:true})
+              document.getElementById("redflag-name").querySelector(".blues-close").innerText = ` ${bluesClose-1} `
               document.getElementById("redflag-name").querySelector(".reds-close").innerText = ` ${redsClose} `
             }
           }
@@ -490,24 +539,79 @@
     const originalNetworkSendCommand = Network.sendCommand
     const settingsRef = {ref:settings}
     const onWindowKeyDown = (event) => {
-      if (!UI.chatBoxOpen() && event.key?.toLowerCase() === settingsRef.ref?.toLowerCase()) {
+      if (!UI.chatBoxOpen() && event.key?.toLowerCase() === settingsRef.ref?.dropFlagKey?.toLowerCase()) {
         Network.sendCommand("drop","",true)
+      } else if (!UI.chatBoxOpen() && event.key?.toLowerCase() === settingsRef.ref?.dropUpgKey?.toLowerCase()) {
+        Network.sendCommand("upgrades","drop",true)
       }
     }
     $(window).on("keydown", onWindowKeyDown)
-    onSettingsUpdated('dropFlagKey', (key) => {
-      settingsRef.ref = key
+    onSettingsUpdated(['dropFlagKey','dropUpgKey'], (values) => {
+      settingsRef.ref = values
       Network.sendCommand = originalNetworkSendCommand
-      if (key) {
+      if (values.dropFlagKey || values.dropUpgKey) {
         Network.sendCommand = (command, value, force) => {
-          if (command === "drop" && !force) { return }
+          if (command === "drop" && !force && values.dropFlagKey) { return }
+          if (command === "upgrades" && value === "drop" && !force && values.dropUpgKey) { return }
           originalNetworkSendCommand(command, value)
         }
       }
     })
-  })
+  });
 
-
+  /**
+   * Message variables
+   */
+  SWAM.on("gameLoaded", function() {
+    const PLANE_LABELS = {
+      1: "Pred",
+      2: "Goli",
+      3: "Heli",
+      4: "Torn",
+      5: "Prow",
+    }
+    const originalNetworkSenders = {
+      sendSay: Network.sendSay,
+      sendTeam: Network.sendTeam,
+      sendWhisper: Network.sendWhisper,
+      sendChat: Network.sendChat
+    }
+    const carrierInfo = {
+      [RED_TEAM]: {plane:null,team:RED_TEAM},
+      [BLUE_TEAM]: {plane:null,team:BLUE_TEAM}
+    }
+    SWAM.on("carrierInfo", (info) => {
+      carrierInfo[info.team] = info
+    })
+    const s = (v) => v!==1 ? "s" : ""
+    const enhanceMessage = (message) => {
+      return message
+      .replace(/\$REC/i,() => {
+        const myTeam = Players.getMe()?.team
+        const recInfo = carrierInfo[myTeam === RED_TEAM ? RED_TEAM : BLUE_TEAM]
+        if (!recInfo) { return ""}
+        return recInfo.plane ? `REC, a [${PLANE_LABELS[recInfo.plane]}] has our flag` + (recInfo.hasCount ? `, with [${recInfo.esc} escort${s(recInfo.esc)}], [${recInfo.rec} recapper${s(recInfo.rec)}] nearby` : "") : ``
+      })
+      .replace(/\$CAP/i,() => {
+        const myTeam = Players.getMe()?.team
+        const capInfo = carrierInfo[myTeam === RED_TEAM ? BLUE_TEAM : RED_TEAM]
+        if (!capInfo) { return ""}
+        return capInfo.plane ? `CAP, a [${PLANE_LABELS[capInfo.plane]}] with enemy flag` + (capInfo.hasCount ? `, has [${capInfo.esc} escort${s(capInfo.esc)}], [${capInfo.rec} recapper${s(capInfo.rec)}] nearby` : "") : ``
+      })
+    }
+    const enhanceSender = (key, msgIndex) => {
+      Network[key] = (...args) => {
+        const enhancedMessage = enhanceMessage(args[msgIndex])
+        if (!enhancedMessage || ['/t','/s'].indexOf(enhancedMessage.trim()) >= 0) { return }
+        args[msgIndex] = enhancedMessage
+        originalNetworkSenders[key](...args)
+      }
+    }
+    enhanceSender('sendSay',0);
+    enhanceSender('sendTeam',0);
+    enhanceSender('sendWhisper',1);
+    enhanceSender('sendChat',0);
+  });
 
   /**
    *  utils
@@ -546,12 +650,12 @@
   }
 
   SWAM.registerExtension({
-      name: "Starmash*",
-      id: "starmashthings",
-      description: "De* collection of Starmash features (see Mod Settings)",
-      author: "Debug",
-      version: "1.1.4",
-      settingsProvider: createSettingsProvider()
+    name: "Starmash*",
+    id: "starmashthings",
+    description: "De* collection of Starmash features (see Mod Settings)",
+    author: "Debug",
+    version: "1.2",
+    settingsProvider: createSettingsProvider()
   });
 
 }();
