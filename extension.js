@@ -1,4 +1,4 @@
-   !function() {
+!function() {
 
   let settings = {
     fixPlayerCount: true,
@@ -7,6 +7,7 @@
     fixHud: true,
     keepFiringWhileTyping:true,
     carrier: 'count',
+    ctfEndFx: false,
     quickResize: {
       key:'B',
       a: {
@@ -42,6 +43,7 @@
     miscSection.addBoolean("fixPlayerCount", "Improve CTF team player count");
     miscSection.addBoolean("respawnLines", "Add CTF respawn lines");
     miscSection.addBoolean("respawnLinesMinimap", "Add CTF respawn lines to minimap");
+    miscSection.addBoolean("ctfEndFx", "Fireworks/color overlay for CTF match end");
     miscSection.addValuesField("carrier", "Display CTF carrier type",
       {
         "count": "Carrier type and esc/rec count",
@@ -176,10 +178,10 @@
 
     const minimapOffsetY = 512*minimapHeight/config.mapHeight
     const minimapOffsetX = 1024*minimapWidth/config.mapWidth
-    const blueXSpawnMinimap = createSprite({color:0x0000FF, x:-minimapWidth/2,y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 1})
-    const redXSpawnMinimap = createSprite({color:0xFF0000, x:-minimapOffsetX - (minimapWidth/2),y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 1})
-    const blueYSpawnMinimap = createSprite({color:0x0000FF, y:-minimapHeight/2, x:-minimapWidth/2,  width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 1})
-    const redYSpawnMinimap = createSprite({color:0xFF0000, y:-minimapOffsetY - minimapHeight/2, x:-minimapOffsetX - minimapWidth,width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 1})
+    const blueXSpawnMinimap = createSprite({color:0x0000FF, x:-minimapWidth/2,y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 0.6})
+    const redXSpawnMinimap = createSprite({color:0xFF0000, x:-minimapOffsetX - (minimapWidth/2),y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 0.6})
+    const blueYSpawnMinimap = createSprite({color:0x0000FF, y:-minimapHeight/2, x:-minimapWidth/2,  width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 0.6})
+    const redYSpawnMinimap = createSprite({color:0xFF0000, y:-minimapOffsetY - minimapHeight/2, x:-minimapOffsetX - minimapWidth,width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 0.6})
 
     const blueXSpawn = createSprite({color:0x0000FF, x:0,y:-config.mapHeight/2, height:config.mapHeight,width:1/game.graphics.layers.groundobjects.scale.x})
     const redXSpawn = createSprite({color:0xFF0000, x:-1024,y:-config.mapHeight/2, height:config.mapHeight,width:1/game.graphics.layers.groundobjects.scale.x})
@@ -472,6 +474,25 @@
       currentSettingsRef.ref = settings
     })
   })
+  /**
+   * CTF WIN COLOR OVERLAY
+   */
+  SWAM.on("gameRunning",async function () {
+    const originalShowBlue = SWAM.mapColorizer.showBlue
+    const originalShowRed = SWAM.mapColorizer.showRed
+    const originalFireworks = SWAM.fx.startFireworks
+    onSettingsUpdated('ctfEndFx',(ctfEndFx) => {
+      if (ctfEndFx) {
+        SWAM.mapColorizer.showBlue = originalShowBlue
+        SWAM.mapColorizer.showRed = originalShowRed
+        SWAM.fx.startFireworks = originalFireworks
+      } else {
+        SWAM.mapColorizer.showBlue = () => {}
+        SWAM.mapColorizer.showRed = () => {}
+        SWAM.fx.startFireworks = () => {}
+      }
+    })
+  })
 
 
 
@@ -654,7 +675,7 @@
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.1",
+    version: "1.2.2",
     settingsProvider: createSettingsProvider()
   });
 
