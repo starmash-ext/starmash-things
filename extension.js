@@ -19,6 +19,7 @@
         squared: false,
       }
     },
+    botsColor: true,
     dropFlagKey: 'Y',
     dropUpgKey: ''
   };
@@ -40,6 +41,7 @@
     miscSection.addBoolean("keepFiringWhileTyping", "Keep firing while typing (except stealthed prowler)");
     miscSection.addString("dropFlagKey", "CTF drop key.");
     miscSection.addString("dropUpgKey", "Drop upgrade key.");
+    miscSection.addBoolean("botsColor", "Bots have different color on minimap");
     miscSection.addBoolean("fixPlayerCount", "Improve CTF team player count");
     miscSection.addBoolean("respawnLines", "Add CTF respawn lines");
     miscSection.addBoolean("respawnLinesMinimap", "Add CTF respawn lines to minimap");
@@ -85,21 +87,23 @@
   /**
    *  FIX PLAYER COUNT
    */
+  let lowPings = {}
+  const isBot = player =>
+   (
+     player.name.indexOf('[bot]') === 0 &&
+     lowPings[player.id] > 0
+   ) ||
+   player.team === 128
+
   SWAM.on("gameRunning",async function () {
 
     const INITIAL_EXTRALATENCY = 0;
-    let lowPings = {}
 
     const originalPlayersKill = Players.kill
     const originalUIUpdateScore = UI.updateScore;
     const originalUIUpdateStats = UI.updateStats;
 
-    const isBot = player =>
-      (
-        player.name.indexOf('[bot] ') === 0 &&
-        lowPings[player.id] > 0
-      ) ||
-      player.team === 128
+
     const isSpec = player =>
       player.removedFromMap && (performance.now() - (player.lastKilled || 0)) > 5000
 
@@ -178,10 +182,10 @@
 
     const minimapOffsetY = 512*minimapHeight/config.mapHeight
     const minimapOffsetX = 1024*minimapWidth/config.mapWidth
-    const blueXSpawnMinimap = createSprite({color:0x0000FF, x:-minimapWidth/2,y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 0.6})
-    const redXSpawnMinimap = createSprite({color:0xFF0000, x:-minimapOffsetX - (minimapWidth/2),y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 0.6})
-    const blueYSpawnMinimap = createSprite({color:0x0000FF, y:-minimapHeight/2, x:-minimapWidth/2,  width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 0.6})
-    const redYSpawnMinimap = createSprite({color:0xFF0000, y:-minimapOffsetY - minimapHeight/2, x:-minimapOffsetX - minimapWidth,width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 0.6})
+    const blueXSpawnMinimap = createSprite({color:0x0000FF, x:-minimapWidth/2,y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 1})
+    const redXSpawnMinimap = createSprite({color:0xFF0000, x:-minimapOffsetX - (minimapWidth/2),y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 1})
+    const blueYSpawnMinimap = createSprite({color:0x0000FF, y:-minimapHeight/2, x:-minimapWidth/2,  width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 1})
+    const redYSpawnMinimap = createSprite({color:0xFF0000, y:-minimapOffsetY - minimapHeight/2, x:-minimapOffsetX - minimapWidth,width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 1})
 
     const blueXSpawn = createSprite({color:0x0000FF, x:0,y:-config.mapHeight/2, height:config.mapHeight,width:1/game.graphics.layers.groundobjects.scale.x})
     const redXSpawn = createSprite({color:0xFF0000, x:-1024,y:-config.mapHeight/2, height:config.mapHeight,width:1/game.graphics.layers.groundobjects.scale.x})
@@ -494,7 +498,33 @@
     })
   })
 
-
+  /**
+   * Bots color on minimap
+   */
+  SWAM.on("gameRunning",async function () {
+    const updateColors = () => {
+      const mobs = UI.getMinimapMobs();
+      Object.keys(mobs).forEach((id) => {
+        const mob = mobs[id]
+        const player = Players.get(id)
+        const mobIsBot = isBot(player)
+        const isNotCrown = mob.sprite.texture.width <= 16
+        if (mobIsBot && isNotCrown) {
+          const f = new PIXI.filters.ColorMatrixFilter()
+          mob.sprite.filters = [f]
+          mob.sprite.scale.set(0.6)
+          f.hue(player.team === RED_TEAM ? 15 : -25,false)
+        }
+      })
+    }
+    onSettingsUpdated('botsColor',(botsColor) => {
+      if (botsColor) {
+        SWAM.on("scoreboardUpdate", updateColors)
+      } else {
+        SWAM.off("scoreboardUpdate", updateColors)
+      }
+    })
+  })
 
   /**
    * Keep firing while typing
@@ -675,7 +705,7 @@
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.2",
+    version: "1.2.3",
     settingsProvider: createSettingsProvider()
   });
 
