@@ -93,7 +93,7 @@
      player.name.indexOf('[bot]') === 0 &&
      lowPings[player.id] > 0
    ) ||
-   player.team === 128
+   player.team > 2
 
   SWAM.on("gameRunning",async function () {
 
