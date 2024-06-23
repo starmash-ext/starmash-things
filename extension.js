@@ -740,7 +740,7 @@
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.5",
+    version: "1.2.6",
     settingsProvider: createSettingsProvider()
   });
 
