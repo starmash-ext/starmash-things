@@ -673,7 +673,7 @@
         return capInfo.plane ? `CAP, a [${emoji}${PLANE_LABELS[capInfo.plane]}] with enemy flag` + (capInfo.hasCount ? `, has [${capInfo.esc} escort${s(capInfo.esc)}], [${capInfo.rec} recapper${s(capInfo.rec)}] nearby` : "") : ``
       })
       .replace(/\$PLANES/i,() => {
-        const players = Object.keys(Players.getIDs()).map(Players.get).filter(p => /*!isBot(p) && */!isSpec(p))
+        const players = Object.keys(Players.getIDs()).map(Players.get).filter(p => !isBot(p) && !isSpec(p))
         const grouped = players.reduce((acc,player) => {
           acc[player.type] = acc[player.type] || [0,0]
           acc[player.type][player.team === RED_TEAM ? 1 : 0]++
