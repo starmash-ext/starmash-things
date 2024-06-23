@@ -5,6 +5,7 @@
     respawnLines: true,
     respawnLinesMinimap: true,
     fixHud: true,
+    selfMinimapDot: false,
     keepFiringWhileTyping:true,
     carrier: 'count',
     ctfEndFx: false,
@@ -44,7 +45,8 @@
     miscSection.addBoolean("botsColor", "Bots have different color on minimap");
     miscSection.addBoolean("fixPlayerCount", "Improve CTF team player count");
     miscSection.addBoolean("respawnLines", "Add CTF respawn lines");
-    miscSection.addBoolean("respawnLinesMinimap", "Add CTF respawn lines to minimap");
+    miscSection.addBoolean("respawnLinesMinimap", "[Minimap] Add CTF respawn lines to minimap");
+    miscSection.addBoolean("selfMinimapDot", "[Minimap] Replaces white rectangle of minimap for small dot (for Vanilla Themes)");
     miscSection.addBoolean("ctfEndFx", "Fireworks/color overlay for CTF match end");
     miscSection.addValuesField("carrier", "Display CTF carrier type",
       {
@@ -89,11 +91,14 @@
    */
   let lowPings = {}
   const isBot = player =>
-   (
-     player.name.indexOf('[bot]') === 0 &&
-     lowPings[player.id] > 0
-   ) ||
-   player.team > 2
+    (
+      player.name.indexOf('[bot]') === 0 &&
+      lowPings[player.id] > 0
+    ) ||
+    player.team > 2
+
+  const isSpec = player =>
+    player.removedFromMap && (performance.now() - (player.lastKilled || 0)) > 5000
 
   SWAM.on("gameRunning",async function () {
 
@@ -104,8 +109,6 @@
     const originalUIUpdateStats = UI.updateStats;
 
 
-    const isSpec = player =>
-      player.removedFromMap && (performance.now() - (player.lastKilled || 0)) > 5000
 
     const toggle = (isEnabled) => {
       if (isEnabled) {
@@ -167,6 +170,7 @@
   SWAM.on("gameRunning",async function () {
     const previousGamesPrep = Games.prep;
     const {height: minimapHeight,width: minimapWidth} = game.graphics.gui.minimap.getLocalBounds()
+
 
     const createSprite = ({color,x,y, height,width, alpha = 0.3}) => {
       var sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
@@ -351,6 +355,23 @@
       })
     })
   }
+
+
+  /**
+   * Small dot minimap_box texture
+   */
+  SWAM.on("gameRunning", function() {
+    const originalMinimapBoxTexture = game.graphics.gui.minimap_box.texture
+    onSettingsUpdated('selfMinimapDot',(selfMinimapDot) => {
+      if (selfMinimapDot) {
+        const mozBaseTexture = new PIXI.Texture.fromImage("https://raw.githubusercontent.com/fabiospampinato/airmash-swam-extensions/master/themes/hit_circles/assets/gui.png");
+        const minimapBoxTexture = new PIXI.Texture(mozBaseTexture.baseTexture, new PIXI.Rectangle(268, 404, 64, 64));
+        game.graphics.gui.minimap_box.texture = minimapBoxTexture
+      } else {
+        game.graphics.gui.minimap_box.texture = originalMinimapBoxTexture
+      }
+    })
+  })
 
   /**
    * CTF flag carrier esc/rec
@@ -641,13 +662,27 @@
         const myTeam = Players.getMe()?.team
         const recInfo = carrierInfo[myTeam === RED_TEAM ? RED_TEAM : BLUE_TEAM]
         if (!recInfo) { return ""}
-        return recInfo.plane ? `REC, a [${PLANE_LABELS[recInfo.plane]}] has our flag` + (recInfo.hasCount ? `, with [${recInfo.esc} escort${s(recInfo.esc)}], [${recInfo.rec} recapper${s(recInfo.rec)}] nearby` : "") : ``
+        const emoji = myTeam === RED_TEAM ? "🔵" : "🔴"
+        return recInfo.plane ? `REC, a [${emoji}${PLANE_LABELS[recInfo.plane]}] has our flag` + (recInfo.hasCount ? `, with [${recInfo.esc} escort${s(recInfo.esc)}], [${recInfo.rec} recapper${s(recInfo.rec)}] nearby` : "") : ``
       })
       .replace(/\$CAP/i,() => {
         const myTeam = Players.getMe()?.team
         const capInfo = carrierInfo[myTeam === RED_TEAM ? BLUE_TEAM : RED_TEAM]
         if (!capInfo) { return ""}
-        return capInfo.plane ? `CAP, a [${PLANE_LABELS[capInfo.plane]}] with enemy flag` + (capInfo.hasCount ? `, has [${capInfo.esc} escort${s(capInfo.esc)}], [${capInfo.rec} recapper${s(capInfo.rec)}] nearby` : "") : ``
+        const emoji = myTeam === RED_TEAM ? "🔴" : "🔵"
+        return capInfo.plane ? `CAP, a [${emoji}${PLANE_LABELS[capInfo.plane]}] with enemy flag` + (capInfo.hasCount ? `, has [${capInfo.esc} escort${s(capInfo.esc)}], [${capInfo.rec} recapper${s(capInfo.rec)}] nearby` : "") : ``
+      })
+      .replace(/\$PLANES/i,() => {
+        const players = Object.keys(Players.getIDs()).map(Players.get).filter(p => /*!isBot(p) && */!isSpec(p))
+        const grouped = players.reduce((acc,player) => {
+          acc[player.type] = acc[player.type] || [0,0]
+          acc[player.type][player.team === RED_TEAM ? 1 : 0]++
+          return acc
+        },{})
+        return Object.entries(grouped)
+        .sort(([planeA],[planeB]) => planeA > planeB ? 1 : -1)
+        .map(([plane,[blue,red]]) => `${PLANE_LABELS[plane]} [${blue}🔵 ${red}🔴]`)
+        .join(" ")
       })
     }
     const enhanceSender = (key, msgIndex) => {
@@ -705,7 +740,7 @@
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.4",
+    version: "1.2.5",
     settingsProvider: createSettingsProvider()
   });
 
