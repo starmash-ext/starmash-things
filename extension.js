@@ -60,6 +60,7 @@
     miscSection.addBoolean("fixPlayerCount", "Improve CTF team player count");
     miscSection.addBoolean("showPlaneCount", "Show plane type counter ($PLANES to send in chat)");
     miscSection.addBoolean("respawnLines", "Add CTF respawn lines");
+    miscSection.addBoolean("nameOnProwlerRadar", "Add names on prowler radar");
     miscSection.addBoolean("respawnLinesMinimap", "[Minimap] Add CTF respawn lines to minimap");
     miscSection.addBoolean("selfMinimapDot", "[Minimap] Replaces white rectangle of minimap for small dot (for Vanilla Themes)");
     miscSection.addBoolean("ctfEndFx", "Fireworks/color overlay for CTF match end");
@@ -699,30 +700,72 @@
   SWAM.on("gameRunning",async function () {
     let circleMapping = {}
 
-    const addNameToPlayerStealth = ({id}) => {
+    const addNameToPlayerStealth = ({id},force) => {
       const player = Players.get(id)
-      if (circleMapping[id] && circleMapping[id]?.children?.length > 0) {
-        circleMapping[id]?.children[0].style?.fill === player.team === BLUE_TEAM ? BLUE_COLOR : RED_COLOR
-        return
+      if (isSpec(player) || player.type !== 5) { return }
+      if (!force && circleMapping[id] && circleMapping[id].find(circle => circle?.children?.length > 0)) {
+        circleMapping[id].forEach(circle => {
+          circle.children[0].style.fill = (player.team === BLUE_TEAM ? BLUE_COLOR : RED_COLOR)
+        })
+        return true
       }
       const circles = game.graphics.layers.groundobjects.children
-      .filter(({renderable,graphicsData}) => graphicsData?.[0]?.shape.radius === 600 && renderable)
+      .filter(({graphicsData}) => graphicsData?.[0]?.shape.radius === 600)
       .filter(({position}) => position.x === player.lowResPos.x && position.y === player.lowResPos.y)
-      if (circles.length === 1) {
-        circleMapping[id] = circles[0]
-        const text = new PIXI.Text(player.name,{fontFamily : ['Open Sans','Roboto','sans-serif'], fontSize: 36, fontWeight: "bold", fill : player.team === BLUE_TEAM ? BLUE_COLOR : RED_COLOR, align : 'center'})
-        text.position.set(-text.width/2,-400)
-        circles[0].addChild(text)
+      if (circles.length === 1 || circles.length === 2) {
+        const isSame = !circleMapping[id] || (
+          (circleMapping[id][0] === circles[0] || circleMapping[id][0] === circles[1]) &&
+          (circleMapping[id][1] === circles[0] || circleMapping[id][1] === circles[1])
+        )
+        if (!isSame) {
+          circleMapping[id].forEach(circle => circle.removeChildren())
+        }
+        circleMapping[id] = circles
+
+
+        circles.forEach(circle => circle.removeChildren())
+        circles.forEach(circle => {
+          const text = new PIXI.Text(player.name,{fontFamily : ['MontserratWeb','Helvetica','sans-serif'], fontSize: 36, fontWeight: "bold", fill : player.team === BLUE_TEAM ? BLUE_COLOR : RED_COLOR, align : 'center'})
+          text.position.set(-text.width/2,-text.height/2)
+          circle.addChild(text)
+        })
+        return true
       }
     }
-    SWAM.on("gamePrep", ()=> {
+    const addAll = () => {
+      if (game.graphics.layers.groundobjects.children.length > 1) {
+        Object.keys(Players.getIDs()).map(id => addNameToPlayerStealth({id}))
+      }
+    }
+
+    const clearAll = () => {
+      game.graphics.layers.groundobjects.children.filter(v => v.graphicsData?.[0]?.shape.radius === 600).forEach(v => v.removeChildren())
       circleMapping = {}
-    })
+    }
+    const reteam = ({id}) => {
+      if (id === Players.getMe().id) {
+        clearAll()
+        addAll()
+      } else {
+        delete circleMapping[id]
+        addNameToPlayerStealth({id})
+      }
+    }
+    const gamePrep = () => {
+      clearAll()
+      addAll()
+    }
     onSettingsUpdated('nameOnProwlerRadar',(ctfEndFx) => {
       if (ctfEndFx) {
-        SWAM.on("playerStealth", addNameToPlayerStealth)
+        SWAM.on("gamePrep",gamePrep)
+        SWAM.on("playerStealth", (p) => addNameToPlayerStealth(p,true))
+        SWAM.on("playerReteamed", reteam)
+        SWAM.on("scoreboardUpdate",addAll)
       } else {
         SWAM.off("playerStealth", addNameToPlayerStealth)
+        SWAM.off("playerReteamed", reteam)
+        SWAM.off("gamePrep", gamePrep)
+        SWAM.off("scoreboardUpdate",addAll)
         game.graphics.layers.groundobjects.children.filter(v => v.graphicsData?.[0]?.shape.radius === 600).forEach(v => v.removeChildren())
       }
     })
@@ -762,7 +805,7 @@
         const emoji = myTeam === RED_TEAM ? "🔴" : "🔵"
         return capInfo.plane ? `CAP, a [${emoji}${PLANE_LABELS[capInfo.plane]?.toLowerCase()}] with enemy flag` + (capInfo.hasCount ? `, has [${capInfo.esc} escort${s(capInfo.esc)}], [${capInfo.rec} recapper${s(capInfo.rec)}] nearby` : "") : ``
       })
-      .replace(/\$PLANES/i,() => {
+      .replace(/\$PLANES|\$SHIPS/i,() => {
         return Object.entries(getPlaneGroups())
         .sort(([planeA],[planeB]) => planeA > planeB ? 1 : -1)
         .map(([plane,[blue,red]]) => `${PLANE_LABELS[plane]?.toLowerCase()}[${blue}${blue>red ?"🔵":red>blue?"🔴":"⚪"}${red}]`)
@@ -824,7 +867,7 @@
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.7",
+    version: "1.2.8",
     settingsProvider: createSettingsProvider()
   });
 
