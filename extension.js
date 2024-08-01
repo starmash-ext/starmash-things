@@ -11,6 +11,8 @@
     showPlaneCount:true,
     ctfEndFx: false,
     nameOnProwlerRadar: true,
+    removeBotsScoreboard: true,
+    addPlaneTypeToScoreboard: true,
     quickResize: {
       key:'B',
       a: {
@@ -35,6 +37,14 @@
     4: "Torn",
     5: "Prow",
   }
+  const PLANE_FULL_LABELS = {
+    1: "Predator",
+    2: "Goliath",
+    3: "Mohawk",
+    4: "Tornado",
+    5: "Prowler",
+  }
+
   const BLUE_COLOR = '#4076E2'
   const RED_COLOR = '#EA4242'
 
@@ -57,14 +67,18 @@
     miscSection.addString("dropFlagKey", "CTF drop key.");
     miscSection.addString("dropUpgKey", "Drop upgrade key.");
     miscSection.addBoolean("botsColor", "Bots have different color on minimap");
-    miscSection.addBoolean("fixPlayerCount", "Improve CTF team player count");
-    miscSection.addBoolean("showPlaneCount", "Show plane type counter ($PLANES to send in chat)");
-    miscSection.addBoolean("respawnLines", "Add CTF respawn lines");
+    miscSection.addBoolean("removeBotsScoreboard", "Remove bots from scoreboard");
+    miscSection.addBoolean("addPlaneTypeToScoreboard", "Add player plane type on scoreboard");
     miscSection.addBoolean("nameOnProwlerRadar", "Add names on prowler radar");
-    miscSection.addBoolean("respawnLinesMinimap", "[Minimap] Add CTF respawn lines to minimap");
-    miscSection.addBoolean("selfMinimapDot", "[Minimap] Replaces white rectangle of minimap for small dot (for Vanilla Themes)");
-    miscSection.addBoolean("ctfEndFx", "Fireworks/color overlay for CTF match end");
-    miscSection.addValuesField("carrier", "Display CTF carrier type ($CAP and $REC to send in chat)",
+
+    const ctfSection = sp.addSection("CTF Options");
+    ctfSection.addBoolean("showPlaneCount", "Show plane type counter ($PLANES to send in chat)");
+    ctfSection.addBoolean("fixPlayerCount", "Improve CTF team player count");
+    ctfSection.addBoolean("respawnLines", "Add CTF respawn lines");
+    ctfSection.addBoolean("respawnLinesMinimap", "[Minimap] Add CTF respawn lines to minimap");
+    ctfSection.addBoolean("selfMinimapDot", "[Minimap] Replaces white rectangle of minimap for small dot (for Vanilla Themes)");
+    ctfSection.addBoolean("ctfEndFx", "Fireworks/color overlay for CTF match end");
+    ctfSection.addValuesField("carrier", "Display CTF carrier type ($CAP and $REC to send in chat)",
       {
         "count": "Carrier type and esc/rec count",
         "carrier": "Carrier only",
@@ -111,7 +125,6 @@
       LOW_PINGS[player.id] > 0
     ) ||
     player.team > 2
-
   const isSpec = player =>
     player.removedFromMap && (performance.now() - (player.lastKilled || 0)) > 5000
 
@@ -123,6 +136,13 @@
       return acc
     }, {})
   }
+
+  /**
+   * Remove up/down chat input
+   */
+  SWAM.on("gameRunning",async function () {
+    $("#chatinput").off("keydown")
+  })
 
   /**
    *  FIX PLAYER COUNT
@@ -449,10 +469,10 @@
             }
           } else {
             if (isBlue) {
-              SWAM.trigger("carrierInfo",{plane:null,team:BLUE_TEAM})
+              SWAM.trigger("carrierInfo",{plane:null,team:BLUE_TEAM,blues:[],reds:[]})
               blueCarrier = null
             } else {
-              SWAM.trigger("carrierInfo",{plane:null,team:RED_TEAM})
+              SWAM.trigger("carrierInfo",{plane:null,team:RED_TEAM,blues:[],reds:[]})
               redCarrier = null
             }
           }
@@ -460,10 +480,10 @@
 
         const getCloseToCarrier = (player) => {
           const players = Object.keys(Players.getIDs()).map(Players.get).filter(({removedFromMap}) => !removedFromMap)
-          .map(({id,team,lowResPos}) => ({id,team,distance: DISTANCE(lowResPos,player.lowResPos)}))
+          .map(({lowResPos,...playerInfo}) => ({...playerInfo,distance: DISTANCE(lowResPos,player.lowResPos)}))
           const blueTeam = players.filter(({team}) => team === BLUE_TEAM)
           const redTeam = players.filter(({team}) => team === RED_TEAM)
-          return [blueTeam.filter(({distance}) => distance < 3500).length, redTeam.filter(({distance}) => distance < 3500).length]
+          return [blueTeam.filter(({distance,id}) => distance < 3500 && id !== player.id), redTeam.filter(({distance,id}) => distance < 3500 && id !== player.id)]
         }
         UI.scoreboardUpdate = (t,n,i) => {
           originalUIscoreboardUpdate(t,n,i)
@@ -471,15 +491,15 @@
             if (type === 'count') {
               if (blueCarrier) {
                 const [bluesClose, redsClose] = getCloseToCarrier(Players.get(blueCarrier))
-                SWAM.trigger("carrierInfo",{plane:Players.get(blueCarrier).type,team: BLUE_TEAM,esc:redsClose-1,rec:bluesClose,hasCount:true})
-                document.getElementById("blueflag-name").querySelector(".blues-close").innerText = ` ${bluesClose} `
-                document.getElementById("blueflag-name").querySelector(".reds-close").innerText = ` ${redsClose-1} `
+                SWAM.trigger("carrierInfo",{plane:Players.get(blueCarrier).type,team: BLUE_TEAM,reds:redsClose,blues:bluesClose,hasCount:true})
+                document.getElementById("blueflag-name").querySelector(".blues-close").innerText = ` ${bluesClose.length} `
+                document.getElementById("blueflag-name").querySelector(".reds-close").innerText = ` ${redsClose.length} `
               }
               if (redCarrier) {
                 const [bluesClose, redsClose] = getCloseToCarrier(Players.get(redCarrier))
-                SWAM.trigger("carrierInfo",{plane:Players.get(redCarrier).type,team:RED_TEAM,rec:redsClose,esc:bluesClose-1,hasCount:true})
-                document.getElementById("redflag-name").querySelector(".blues-close").innerText = ` ${bluesClose-1} `
-                document.getElementById("redflag-name").querySelector(".reds-close").innerText = ` ${redsClose} `
+                SWAM.trigger("carrierInfo",{plane:Players.get(redCarrier).type,team:RED_TEAM,reds:redsClose,blues:bluesClose,hasCount:true})
+                document.getElementById("redflag-name").querySelector(".blues-close").innerText = ` ${bluesClose.length} `
+                document.getElementById("redflag-name").querySelector(".reds-close").innerText = ` ${redsClose.length} `
               }
             }
           }
@@ -557,6 +577,33 @@
         SWAM.on("scoreboardUpdate", updateColors)
       } else {
         SWAM.off("scoreboardUpdate", updateColors)
+      }
+    })
+  })
+  /**
+   * Remove bots from scoreboard
+   */
+  SWAM.on("gameRunning",async function () {
+    const settingsRef = {ref:settings}
+    const PLANES = [1,2,3,4,5].map(i => $("#selectaircraft-"+i).css("background-image"))
+    const enhanceScoreboard = () => {
+      $("#scoreboard .line").each((i,e) => {
+        const el = $(e)
+        const player = Players.get(el.data("playerid"))
+        if (player && isBot(player) && settingsRef.ref.removeBotsScoreboard) {
+          el.remove()
+        }
+        if (player && settingsRef.ref.addPlaneTypeToScoreboard) {
+          el.find(".flag").after($("<span class='small flag'></span>").css({"background-image":PLANES[player.type-1],"opacity":player.type === 1 ? '0.2' : '1'}))
+        }
+      })
+    }
+    onSettingsUpdated(['removeBotsScoreboard','addPlaneTypeToScoreboard'],(settings) => {
+      settingsRef.ref = settings
+      if (settings.removeBotsScoreboard || settings.addPlaneTypeToScoreboard) {
+        SWAM.on("detailedScoreUpdate", enhanceScoreboard)
+      } else {
+        SWAM.off("detailedScoreUpdate", enhanceScoreboard)
       }
     })
   })
@@ -649,8 +696,44 @@
    * Show Plane Count
    */
   SWAM.on("gameRunning",async function () {
-    const originalUIUpdateStats = UI.updateStats;
+    let lastTooltipPlaneId = null
     const toggle = (isEnabled) => {
+      const handleMouseEnter = (ev) => {
+        lastTooltipPlaneId = ev.currentTarget.id.replace(/\D/g,"")
+        updateTooltip(lastTooltipPlaneId)
+      }
+      const handleMouseLeave = (ev) => {
+        lastTooltipPlaneId = null
+      }
+      const updateTooltip = (planeId = lastTooltipPlaneId) => {
+        if (game.gameType !== SWAM.GAME_TYPE.CTF || !planeId) { return }
+        const players = Object.keys(Players.getIDs())
+          .map(Players.get).filter(p => !isBot(p) && !isSpec(p) && p.type === Number(planeId))
+          .sort((a,b) => a.name.localeCompare(b.name))
+        const bluePlayers = players.filter(p => p.team === BLUE_TEAM)
+        const redPlayers = players.filter(p => p.team === RED_TEAM)
+        const tooltip = $("#tooltip")
+        const myTeam = Players.getMe().team
+        const planeName = Number(planeId) === 5 && !players.find(p => p.team === myTeam) && players.find(p => p.team !== myTeam)
+          ? "Scum" : PLANE_FULL_LABELS[planeId]
+        const HEADER = `<div class="header">${planeName}</div>`
+        if (!players.length) {
+          tooltip.html(
+            `${HEADER}
+<div class="name" style="color: #dcdcdc;">No player using this plane</div>`
+          )
+        } else {
+        tooltip.html(
+          `${HEADER}
+${bluePlayers.map(player =>
+  `<div class="name" style="color: ${BLUE_COLOR};"><span class="flag small flag-${player.flag}"></span>${player.name}</div>`
+).join("")}
+${redPlayers.map(player =>
+  `<div class="name" style="color: ${RED_COLOR};"><span class="flag small flag-${player.flag}"></span>${player.name}</div>`
+).join("")}
+`)
+          }
+      }
       const appendPlaneNumber = (container,team,number) => {
         if (!number) { return }
         const el = document.createElement('div')
@@ -671,24 +754,27 @@
         el.textContent = number
         container.appendChild(el)
       }
+      const updatePlaneCount = (Bt) => { // same code from engine.js
+        if (game.gameType == SWAM.GAME_TYPE.CTF) {
+          updateTooltip();
+          const planeGroups = getPlaneGroups()
+          Object.keys(PLANE_LABELS).map(planeId => {
+            const planeIcon = document.getElementById("selectaircraft-"+planeId)
+            if (planeIcon) {
+              [...planeIcon.children].forEach(v => v.remove())
+              const [bluePlanes,redPlanes] = planeGroups[planeId] || []
+              appendPlaneNumber(planeIcon,BLUE_TEAM,bluePlanes)
+              appendPlaneNumber(planeIcon,RED_TEAM,redPlanes)
+            }
+          })
+        }
+      }
       if (isEnabled) {
-       UI.updateStats = function (Bt) { // same code from engine.js
-         originalUIUpdateStats(Bt)
-         if (game.gameType == SWAM.GAME_TYPE.CTF) {
-           const planeGroups = getPlaneGroups()
-           Object.keys(PLANE_LABELS).map(planeId => {
-             const planeIcon = document.getElementById("selectaircraft-"+planeId)
-             if (planeIcon) {
-               [...planeIcon.children].forEach(v => v.remove())
-               const [bluePlanes,redPlanes] = planeGroups[planeId] || []
-               appendPlaneNumber(planeIcon,BLUE_TEAM,bluePlanes)
-               appendPlaneNumber(planeIcon,RED_TEAM,redPlanes)
-             }
-           })
-         }
-       }
+        $(".aircraft").on("mouseenter",handleMouseEnter).on("mouseleave",handleMouseLeave)
+        SWAM.on("scoreboardUpdate", updatePlaneCount)
       } else {
-        UI.updateStats = originalUIUpdateStats;
+        $(".aircraft").off("mouseenter",handleMouseEnter).off("mouseleave",handleMouseLeave)
+        SWAM.off("scoreboardUpdate", updatePlaneCount)
       }
     }
     onSettingsUpdated('showPlaneCount', toggle)
@@ -788,7 +874,7 @@
     SWAM.on("carrierInfo", (info) => {
       carrierInfo[info.team] = info
     })
-    const s = (v) => v!==1 ? "s" : ""
+    const getEmojiColor = (blue,red) => blue>red ?"🔵":red>blue?"🔴":"⚪"
     const enhanceMessage = (message) => {
       return message
       .replace(/\$REC/i,() => {
@@ -796,19 +882,29 @@
         const recInfo = carrierInfo[myTeam === RED_TEAM ? RED_TEAM : BLUE_TEAM]
         if (!recInfo) { return ""}
         const emoji = myTeam === RED_TEAM ? "🔵" : "🔴"
-        return recInfo.plane ? `REC, a [${emoji}${PLANE_LABELS[recInfo.plane]?.toLowerCase()}] has our flag` + (recInfo.hasCount ? `, with [${recInfo.esc} escort${s(recInfo.esc)}], [${recInfo.rec} recapper${s(recInfo.rec)}] nearby` : "") : ``
+        const redBots = recInfo.reds.filter(isBot).length
+        const blueBots = recInfo.blues.filter(isBot).length
+        const redPlayers = recInfo.reds.length - redBots
+        const bluePlayers = recInfo.blues.length - blueBots
+        return recInfo.plane ? `REC! ${emoji}${PLANE_LABELS[recInfo.plane]} has our flag.` +
+          (recInfo.hasCount ? ` Nearby 👨🏻[${bluePlayers}${getEmojiColor(bluePlayers,redPlayers)}${redPlayers}] 🤖[${blueBots}${getEmojiColor(blueBots,redBots)}${redBots}]` : "") : ``
       })
       .replace(/\$CAP/i,() => {
         const myTeam = Players.getMe()?.team
         const capInfo = carrierInfo[myTeam === RED_TEAM ? BLUE_TEAM : RED_TEAM]
         if (!capInfo) { return ""}
         const emoji = myTeam === RED_TEAM ? "🔴" : "🔵"
-        return capInfo.plane ? `CAP, a [${emoji}${PLANE_LABELS[capInfo.plane]?.toLowerCase()}] with enemy flag` + (capInfo.hasCount ? `, has [${capInfo.esc} escort${s(capInfo.esc)}], [${capInfo.rec} recapper${s(capInfo.rec)}] nearby` : "") : ``
+        const redBots = capInfo.reds.filter(isBot).length
+        const blueBots = capInfo.blues.filter(isBot).length
+        const redPlayers = capInfo.reds.length - redBots
+        const bluePlayers = capInfo.blues.length - blueBots
+        return capInfo.plane ? `CAP! ${emoji}${PLANE_LABELS[capInfo.plane]} with enemy flag.` +
+          (capInfo.hasCount ? ` Nearby 👨🏻[${bluePlayers}${getEmojiColor(bluePlayers,redPlayers)}${redPlayers}] 🤖[${blueBots}${getEmojiColor(blueBots,redBots)}${redBots}]` : "") : ``
       })
       .replace(/\$PLANES|\$SHIPS/i,() => {
         return Object.entries(getPlaneGroups())
         .sort(([planeA],[planeB]) => planeA > planeB ? 1 : -1)
-        .map(([plane,[blue,red]]) => `${PLANE_LABELS[plane]?.toLowerCase()}[${blue}${blue>red ?"🔵":red>blue?"🔴":"⚪"}${red}]`)
+        .map(([plane,[blue,red]]) => `${PLANE_LABELS[plane]?.toLowerCase()}[${blue}${getEmojiColor(blue,red)}${red}]`)
         .join(" ")
       })
     }
@@ -867,7 +963,7 @@
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.8",
+    version: "1.2.9",
     settingsProvider: createSettingsProvider()
   });
 
