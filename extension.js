@@ -67,7 +67,6 @@
     miscSection.addString("dropFlagKey", "CTF drop key.");
     miscSection.addString("dropUpgKey", "Drop upgrade key.");
     miscSection.addBoolean("botsColor", "Bots have different color on minimap");
-    miscSection.addBoolean("removeBotsScoreboard", "Remove bots from scoreboard");
     miscSection.addBoolean("addPlaneTypeToScoreboard", "Add player plane type on scoreboard");
     miscSection.addBoolean("nameOnProwlerRadar", "Add names on prowler radar");
 
@@ -77,6 +76,7 @@
     ctfSection.addBoolean("respawnLines", "Add CTF respawn lines");
     ctfSection.addBoolean("respawnLinesMinimap", "[Minimap] Add CTF respawn lines to minimap");
     ctfSection.addBoolean("selfMinimapDot", "[Minimap] Replaces white rectangle of minimap for small dot (for Vanilla Themes)");
+    ctfSection.addBoolean("removeBotsScoreboard", "Remove bots from scoreboard");
     ctfSection.addBoolean("ctfEndFx", "Fireworks/color overlay for CTF match end");
     ctfSection.addValuesField("carrier", "Display CTF carrier type ($CAP and $REC to send in chat)",
       {
@@ -588,6 +588,7 @@
     const PLANES = [1,2,3,4,5].map(i => $("#selectaircraft-"+i).css("background-image"))
     const enhanceScoreboard = () => {
       $("#scoreboard .line").each((i,e) => {
+        if (game.gameType !== SWAM.GAME_TYPE.CTF) { return }
         const el = $(e)
         const player = Players.get(el.data("playerid"))
         if (player && isBot(player) && settingsRef.ref.removeBotsScoreboard) {
