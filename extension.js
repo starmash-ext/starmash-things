@@ -588,14 +588,14 @@
     const PLANES = [1,2,3,4,5].map(i => $("#selectaircraft-"+i).css("background-image"))
     const enhanceScoreboard = () => {
       $("#scoreboard .line").each((i,e) => {
-        if (game.gameType !== SWAM.GAME_TYPE.CTF) { return }
         const el = $(e)
         const player = Players.get(el.data("playerid"))
-        if (player && isBot(player) && settingsRef.ref.removeBotsScoreboard) {
-          el.remove()
-        }
         if (player && settingsRef.ref.addPlaneTypeToScoreboard) {
           el.find(".flag").after($("<span class='small flag'></span>").css({"background-image":PLANES[player.type-1],"opacity":player.type === 1 ? '0.2' : '1'}))
+        }
+        if (game.gameType !== SWAM.GAME_TYPE.CTF) { return }
+        if (player && isBot(player) && settingsRef.ref.removeBotsScoreboard) {
+          el.remove()
         }
       })
     }
