@@ -597,8 +597,8 @@
             "opacity":
               isSpec(player)
               ? '0'
-                : player.type === 1 
-                  ? '0.2' 
+                : player.type === 1
+                  ? '0.2'
                   : '1'
           }))
         }
@@ -874,7 +874,7 @@ ${redPlayers.map(player =>
     let circleMapping = {}
     const circle = new PIXI.Graphics
     circle.clear();
-    circle.beginFill("#FAFAFA", .125);
+    circle.beginFill(0x999999, .125);
     circle.drawCircle(0, 0, 600);
     circle.endFill();
     circle.renderable = false
@@ -1016,7 +1016,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.10",
+    version: "1.2.11",
     settingsProvider: createSettingsProvider()
   });
 
