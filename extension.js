@@ -11,6 +11,7 @@
     showPlaneCount:true,
     ctfEndFx: false,
     nameOnProwlerRadar: true,
+    selfProwlerRadar: true,
     removeBotsScoreboard: true,
     addPlaneTypeToScoreboard: true,
     quickResize: {
@@ -69,6 +70,7 @@
     miscSection.addBoolean("botsColor", "Bots have different color on minimap");
     miscSection.addBoolean("addPlaneTypeToScoreboard", "Add player plane type on scoreboard");
     miscSection.addBoolean("nameOnProwlerRadar", "Add names on prowler radar");
+    miscSection.addBoolean("selfProwlerRadar", "Add self radar to prowler (what radar players are seeing)");
 
     const ctfSection = sp.addSection("CTF Options");
     ctfSection.addBoolean("showPlaneCount", "Show plane type counter ($PLANES to send in chat)");
@@ -591,7 +593,14 @@
         const el = $(e)
         const player = Players.get(el.data("playerid"))
         if (player && settingsRef.ref.addPlaneTypeToScoreboard) {
-          el.find(".flag").after($("<span class='small flag'></span>").css({"background-image":PLANES[player.type-1],"opacity":player.type === 1 ? '0.2' : '1'}))
+          el.find(".flag").after($("<span class='small flag'></span>").css({"background-image":PLANES[player.type-1],
+            "opacity":
+              isSpec(player)
+              ? '0'
+                : player.type === 1 
+                  ? '0.2' 
+                  : '1'
+          }))
         }
         if (game.gameType !== SWAM.GAME_TYPE.CTF) { return }
         if (player && isBot(player) && settingsRef.ref.removeBotsScoreboard) {
@@ -842,8 +851,8 @@ ${redPlayers.map(player =>
       clearAll()
       addAll()
     }
-    onSettingsUpdated('nameOnProwlerRadar',(ctfEndFx) => {
-      if (ctfEndFx) {
+    onSettingsUpdated('nameOnProwlerRadar',(nameOnProwlerRadar) => {
+      if (nameOnProwlerRadar) {
         SWAM.on("gamePrep",gamePrep)
         SWAM.on("playerStealth", (p) => addNameToPlayerStealth(p,true))
         SWAM.on("playerReteamed", reteam)
@@ -854,6 +863,49 @@ ${redPlayers.map(player =>
         SWAM.off("gamePrep", gamePrep)
         SWAM.off("scoreboardUpdate",addAll)
         game.graphics.layers.groundobjects.children.filter(v => v.graphicsData?.[0]?.shape.radius === 600).forEach(v => v.removeChildren())
+      }
+    })
+  })
+
+  /**
+   * Self Prowler radar
+   */
+  SWAM.on("gameRunning",async function () {
+    let circleMapping = {}
+    const circle = new PIXI.Graphics
+    circle.clear();
+    circle.beginFill("#FAFAFA", .125);
+    circle.drawCircle(0, 0, 600);
+    circle.endFill();
+    circle.renderable = false
+    const text = new PIXI.Text("",{fontFamily : ['MontserratWeb','Helvetica','sans-serif'], fontSize: 36, fontWeight: "bold", fill : BLUE_COLOR, align : 'center'})
+    text.position.set(-text.width/2,-text.height/2)
+    circle.addChild(text)
+    game.graphics.layers.groundobjects.addChild(circle)
+
+    const updateStealth = () => {
+      const me = Players.getMe()
+      if (me?.stealthed) {
+        text.text = me.name
+        text.fill = me.team === BLUE_TEAM ? BLUE_COLOR : RED_COLOR
+        circle.position.set(me.lowResPos.x, me.lowResPos.y)
+        circle.renderable = true
+      } else {
+        circle.renderable = false
+      }
+    }
+
+    onSettingsUpdated('selfProwlerRadar',(selfProwlerRadar) => {
+      if (selfProwlerRadar) {
+        SWAM.on("gamePrep",updateStealth)
+        SWAM.on("playerStealth", updateStealth)
+        SWAM.on("scoreboardUpdate",updateStealth)
+        SWAM.on("playerReteamed", updateStealth)
+      } else {
+        SWAM.off("gamePrep",updateStealth)
+        SWAM.off("playerStealth", updateStealth)
+        SWAM.off("scoreboardUpdate",updateStealth)
+        SWAM.off("playerReteamed", updateStealth)
       }
     })
   })
@@ -964,7 +1016,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.9",
+    version: "1.2.10",
     settingsProvider: createSettingsProvider()
   });
 
