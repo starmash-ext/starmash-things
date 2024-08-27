@@ -1031,7 +1031,7 @@ ${redPlayers.map(player =>
           currentMode = 'auto';
           currentAssisted = null
           currentLeader = getPlayerByName(text.replace(' has been chosen as the new team leader.',''))
-        } else if (text.indexOf(' the new team leader.')>=0) {
+        } else if (text.indexOf(' the new team leader.')>=0 && text.indexOf("#yes") < 0) {
           currentMode = 'auto';
           currentAssisted = null
           currentLeader = getPlayerByName(text.replace(/^.* has made (.*) the new team leader\.$/,'$1'))
@@ -1327,7 +1327,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.12",
+    version: "1.2.13",
     settingsProvider: createSettingsProvider()
   });
 
