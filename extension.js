@@ -10,6 +10,7 @@
     carrier: 'count',
     showPlaneCount:true,
     ctfEndFx: false,
+    showBotMode: true,
     nameOnProwlerRadar: true,
     selfProwlerRadar: true,
     removeBotsScoreboard: true,
@@ -73,6 +74,7 @@
     miscSection.addBoolean("selfProwlerRadar", "Add self radar to prowler (what radar players are seeing)");
 
     const ctfSection = sp.addSection("CTF Options");
+    ctfSection.addBoolean("showBotMode", "Show bot mode (cap,rec...) on top of the screen");
     ctfSection.addBoolean("showPlaneCount", "Show plane type counter ($PLANES to send in chat)");
     ctfSection.addBoolean("fixPlayerCount", "Improve CTF team player count");
     ctfSection.addBoolean("respawnLines", "Add CTF respawn lines");
@@ -173,20 +175,31 @@
         LOW_PINGS[p.id] = (LOW_PINGS[p.id] || 0) + (p.ping < 10 ? 1 : -1)
       })
     }
+    let currentTeamCount = ""
     const toggle = (isEnabled) => {
       if (isEnabled) {
-        UI.updateStats = function (Bt) { // same code from engine.js
-          let Gt = "";
-          if (game.gameType == SWAM.GAME_TYPE.CTF) {
-            let Ht = 0
-              , jt = 0;
-            forEachPlayer(Wt => {
-                if (!isSpec(Wt) && !isBot(Wt)) { // new code
-                  BLUE_TEAM == Wt.team ? Ht++ : jt++
-                }
+        const countTeamPlayers = () => {
+          let Ht = 0
+            , jt = 0;
+          forEachPlayer(Wt => {
+              if (!isSpec(Wt) && !isBot(Wt)) { // new code
+                BLUE_TEAM == Wt.team ? Ht++ : jt++
               }
-            ),
-              Gt = "<span class='greyed'>&nbsp;&nbsp;(<span style='color: #4076E2'>" + Ht + "</span>&nbsp;/&nbsp;<span style='color: #EA4242'>" + jt + "</span>)<span class='greyed'>"
+            }
+          ),
+            currentTeamCount = "<span id='starmash-team-count'><span class='greyed'>&nbsp;&nbsp;(<span style='color: #4076E2'>" + Ht + "</span>&nbsp;/&nbsp;<span style='color: #EA4242'>" + jt + "</span>)</span>"
+        }
+        const updateTeamPlayers = () => {
+          if (game.gameType == SWAM.GAME_TYPE.CTF) {
+            countTeamPlayers()
+            const teamCount = $(currentTeamCount)
+            $("#starmash-team-count .greyed:first").replaceWith(teamCount.find(".greyed"))
+          }
+        }
+        UI.updateStats = function (Bt) { // same code from engine.js
+          let Gt = currentTeamCount;
+          if (game.gameType == SWAM.GAME_TYPE.CTF && !Gt) {
+            countTeamPlayers()
           }
           if (game.fakeExtraLatency == INITIAL_EXTRALATENCY) {
             let Ht = Math.max(Bt.ping, 130)
@@ -197,11 +210,13 @@
           SWAM.spoofLatency && (Bt.ping -= game.fakeExtraLatency);
           var Xt = Bt.playerstotal
             , Yt = "";
-          Yt += '<div class="item"><span class="icon-container"><div class="icon players"></div></span><span class="greyed">' + Bt.playersgame + "&nbsp;/&nbsp;</span>" + Xt + Gt + '<span class="icon-container padded"><div class="icon ping"></div></span>' + Bt.ping + '<span class="millis">ms</span></div>',
+          Yt += '<div class="item"><span class="icon-container"><div class="icon players"></div></span><span class="greyed">' + Bt.playersgame + "&nbsp;/&nbsp;</span>" + Xt + Gt + '<span class="greyed"><span class="icon-container padded"><div class="icon ping"></div></span>' + Bt.ping + '<span class="millis">ms</span></div>',
             $("#gameinfo").html(Yt),
             game.ping = Bt.ping
         };
+        SWAM.on("scoreboardUpdate", updateTeamPlayers)
       } else {
+        SWAM.off("scoreboardUpdate", updateTeamPlayers)
         UI.updateStats = originalUIUpdateStats;
       }
     }
@@ -453,7 +468,7 @@
             playerPlane.prepend(bluesClose)
             playerPlane.append(redsClose)
             if (isBlue) {
-              SWAM.trigger("carrierInfo",{plane:player.type,team:BLUE_TEAM})
+              SWAM.trigger("carrierInfo",{plane:player.type,player,team:BLUE_TEAM})
               blueCarrier = t.id
               playerPlane.style.position = "absolute"
               playerPlane.style.top = "-20px"
@@ -461,7 +476,7 @@
               playerPlane.style.right = "72px"
               element.insertBefore(playerPlane,element.querySelector(".rounds"))
             } else {
-              SWAM.trigger("carrierInfo",{plane:player.type,team:RED_TEAM})
+              SWAM.trigger("carrierInfo",{plane:player.type,player,team:RED_TEAM})
               redCarrier = t.id
               playerPlane.style.position = "absolute"
               playerPlane.style.top = "-20px"
@@ -493,13 +508,13 @@
             if (type === 'count') {
               if (blueCarrier) {
                 const [bluesClose, redsClose] = getCloseToCarrier(Players.get(blueCarrier))
-                SWAM.trigger("carrierInfo",{plane:Players.get(blueCarrier).type,team: BLUE_TEAM,reds:redsClose,blues:bluesClose,hasCount:true})
+                SWAM.trigger("carrierInfo",{plane:Players.get(blueCarrier).type,player:Players.get(blueCarrier),team: BLUE_TEAM,reds:redsClose,blues:bluesClose,hasCount:true})
                 document.getElementById("blueflag-name").querySelector(".blues-close").innerText = ` ${bluesClose.length} `
                 document.getElementById("blueflag-name").querySelector(".reds-close").innerText = ` ${redsClose.length} `
               }
               if (redCarrier) {
                 const [bluesClose, redsClose] = getCloseToCarrier(Players.get(redCarrier))
-                SWAM.trigger("carrierInfo",{plane:Players.get(redCarrier).type,team:RED_TEAM,reds:redsClose,blues:bluesClose,hasCount:true})
+                SWAM.trigger("carrierInfo",{plane:Players.get(redCarrier).type,player:Players.get(redCarrier),team:RED_TEAM,reds:redsClose,blues:bluesClose,hasCount:true})
                 document.getElementById("redflag-name").querySelector(".blues-close").innerText = ` ${bluesClose.length} `
                 document.getElementById("redflag-name").querySelector(".reds-close").innerText = ` ${redsClose.length} `
               }
@@ -724,8 +739,8 @@
         const redPlayers = players.filter(p => p.team === RED_TEAM)
         const tooltip = $("#tooltip")
         const myTeam = Players.getMe().team
-        const planeName = Number(planeId) === 5 && !players.find(p => p.team === myTeam) && players.find(p => p.team !== myTeam)
-          ? "Scum" : PLANE_FULL_LABELS[planeId]
+        const planeName = /*Number(planeId) === 5 && !players.find(p => p.team === myTeam) && players.find(p => p.team !== myTeam)
+          ? "Scum" : */PLANE_FULL_LABELS[planeId]
         const HEADER = `<div class="header">${planeName}</div>`
         if (!players.length) {
           tooltip.html(
@@ -939,7 +954,7 @@ ${redPlayers.map(player =>
         const blueBots = recInfo.blues.filter(isBot).length
         const redPlayers = recInfo.reds.length - redBots
         const bluePlayers = recInfo.blues.length - blueBots
-        return recInfo.plane ? `REC! ${emoji}${PLANE_LABELS[recInfo.plane]} has our flag.` +
+        return recInfo.plane ? `REC! ${emoji}${recInfo.player?.name} on ${PLANE_LABELS[recInfo.plane]}.` +
           (recInfo.hasCount ? ` Nearby 👨🏻[${bluePlayers}${getEmojiColor(bluePlayers,redPlayers)}${redPlayers}] 🤖[${blueBots}${getEmojiColor(blueBots,redBots)}${redBots}]` : "") : ``
       })
       .replace(/\$CAP/i,() => {
@@ -951,7 +966,7 @@ ${redPlayers.map(player =>
         const blueBots = capInfo.blues.filter(isBot).length
         const redPlayers = capInfo.reds.length - redBots
         const bluePlayers = capInfo.blues.length - blueBots
-        return capInfo.plane ? `CAP! ${emoji}${PLANE_LABELS[capInfo.plane]} with enemy flag.` +
+        return capInfo.plane ? `CAP! ${emoji}${capInfo.player?.name} on ${PLANE_LABELS[capInfo.plane]}.` +
           (capInfo.hasCount ? ` Nearby 👨🏻[${bluePlayers}${getEmojiColor(bluePlayers,redPlayers)}${redPlayers}] 🤖[${blueBots}${getEmojiColor(blueBots,redBots)}${redBots}]` : "") : ``
       })
       .replace(/\$PLANES|\$SHIPS/i,() => {
@@ -974,6 +989,300 @@ ${redPlayers.map(player =>
     enhanceSender('sendWhisper',1);
     enhanceSender('sendChat',0);
   });
+
+
+  /**
+   * Leader enhancements
+   */
+  SWAM.on("gameRunning", () => {
+    const BOTS_MODE_SMALL_LABEL = {
+      recover: 'recap',
+      capture: 'cap'
+    }
+    const MODE_COLORS = {
+      'auto':'#193729',
+      'recover':'#00a1ff',
+      'defend':'#9100ff',
+      'capture':'#ff8d00',
+      'buddy':'#ff00ff',
+      'assist':'#1b781b'
+    }
+    let currentLeader = null;
+    let currentMode = null
+    let currentAssisted = null;
+    let lastCommandLinePlayer = null
+    let lastAssistLine = '';
+    const getPlayerByName = (name) => {
+      return Object.keys(Players.getIDs()).map(Players.get).find(p => p.name === name)
+    }
+    SWAM.on("chatLineAdded",(player,text,type) => {
+      if (text.indexOf("#assist")>=0) {
+        lastAssistLine = unescapeHTML(text);
+        return;
+      }
+      if (['#cap','#recap','#recover','#buddy','#defend','#auto','#storm'].indexOf(text)>=0 || text.indexOf("#assist ")>=0) {
+        lastCommandLinePlayer = player
+        return
+      }
+      if (isBot(player)) {
+        if (text.indexOf(" is still the team leader.")>0) {
+          currentLeader = getPlayerByName(text.replace(" is still the team leader.",""))
+        } else if (text.indexOf(' has been chosen as the new team leader.')>=0) {
+          currentMode = 'auto';
+          currentAssisted = null
+          currentLeader = getPlayerByName(text.replace(' has been chosen as the new team leader.',''))
+        } else if (text.indexOf(' the new team leader.')>=0) {
+          currentMode = 'auto';
+          currentAssisted = null
+          currentLeader = getPlayerByName(text.replace(/^.* has made (.*) the new team leader\.$/,'$1'))
+        } else if (text.indexOf('The blue team has 6 bots in ')===0) {
+          currentMode = text.split('The blue team has 6 bots in ')[1].split(' ')[0]
+          currentLeader = getPlayerByName(text.split('controlled by ')[1].replace(/\.$/,''))
+        } else if (text.indexOf('The red team has 6 bots in ')===0) {
+          currentMode = text.split('The red team has 6 bots in ')[1].split(' ')[0]
+          currentLeader = getPlayerByName(text.split('controlled by ')[1].replace(/\.$/,''))
+        } else {
+          switch (text) {
+            case 'Bots will storm the base in 60 seconds!':
+              currentMode = 'storm';
+              currentAssisted = null
+              currentLeader = lastCommandLinePlayer
+            case 'recover mode enabled.':
+              currentMode = 'recover';
+              currentAssisted = null
+              currentLeader = lastCommandLinePlayer
+              break;
+            case 'capture mode enabled.':
+              currentMode = 'capture';
+              currentAssisted = null
+              currentLeader = lastCommandLinePlayer
+              break;
+            case 'defend mode enabled.':
+              currentMode = 'defend';
+              currentAssisted = null
+              currentLeader = lastCommandLinePlayer
+              break;
+            case 'auto mode enabled.':
+              currentMode = 'auto';
+              currentAssisted = null
+              currentLeader = lastCommandLinePlayer
+              break;
+            case 'buddy mode enabled.':
+              currentMode = 'buddy';
+              currentAssisted = null
+              currentLeader = lastCommandLinePlayer
+              break;
+            case 'assist mode enabled.':
+              currentLeader = lastCommandLinePlayer
+              const assisted = lastAssistLine.replace("#assist ","")
+              if (assisted === 'me') {
+                currentAssisted = currentLeader.name
+              } else {
+                currentAssisted = assisted;
+              }
+              currentMode = 'assist';
+              break;
+          }
+        }
+        SWAM.trigger("leaderInfo",{mode:currentMode,leader:currentLeader,assist: currentAssisted})
+      }
+    })
+    const resetMode = (defaultMode = '') => {
+      currentMode = defaultMode
+      currentAssisted = null
+      SWAM.trigger("leaderInfo",{mode:currentMode,leader:currentLeader})
+    }
+    const resetLeader = (defaultMode = '') => {
+      resetMode(defaultMode)
+      currentLeader = null
+    }
+    SWAM.on("CTF_MatchEnded", () => resetLeader('auto'))
+    SWAM.on("gamePrep", resetLeader)
+    const onPlayerChange =  ({id}) => {
+      if (id === Players.getMe().id) {
+        resetLeader()
+      } else if (Players.getByName(currentAssisted)?.id === id) {
+        resetMode('auto')
+      }
+    }
+    SWAM.on("playerReteamed",onPlayerChange)
+    SWAM.on("playerDestroyed", onPlayerChange)
+
+    /*SWAM.on("CTF_FlagEvent",(_,team,action) => {
+      switch (action) {
+        case 'taken':
+      }
+      if (false && currentLeader === Players.getMe()) {
+        if (team === Players.getMe().team) {
+          if (action === 'taken') {
+            if (currentMode === 'defend') {
+              Network.sendTeam("#recap")
+            }
+          } else if (action === 'returned') {
+            // if ()
+          } else if (currentMode === 'recap') {
+            Network.sendTeam("#defend")
+          }
+        } else if (action === 'captured') {
+          // SWAM.trigger("leaderInfo", {mode: 'recover', leader: currentLeader})
+        }
+      }
+    })*/
+
+    const modeText = $("<span></span>").css({
+                                              whiteSpace: 'nowrap',
+                                              overflow: 'hidden',
+                                              maxWidth: '100px',
+                                              textOverflow: 'ellipsis',
+                                              display: 'block',
+                                            })
+    const assistText = $("<span></span>").css({
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                maxWidth: '100px',
+                                                textOverflow: 'ellipsis',
+                                                display: 'block',
+                                              })
+    const modeContainer = $("<div></div>").css({
+                                                 verticalAlign: 'top',
+                                                 padding: '6px 4px',
+                                                 backgroundColor: '#228a12',
+                                                 borderRadius: '4px',
+                                                 fontSize: '13px',
+                                                 fontWeight: '700',
+                                                 cursor: 'pointer',
+                                                 color: '#fff',
+                                                 textShadow: '0 -1px 0 rgba(0, 0, 0, .6)',
+                                                 borderBottom: '2px solid rgba(0, 0, 0, .2)'
+                                               })
+    const leaderContainer = $("<div>").css({
+                                             fontSize: '12px',
+                                             paddingLeft: '32px',
+                                             maxWidth: '100px',
+                                             textOverflow: 'ellipsis',
+                                             whiteSpace: 'nowrap',
+                                             overflow: 'hidden',
+                                             display: 'inline-block',
+                                             color: '#fff',
+                                             fontWeight: '700',
+                                             marginRight: '20px',
+                                             verticalAlign: 'middle',
+                                             textShadow: '0 0 6px rgba(0, 0, 0, .6)'
+                                           })
+    let hasStarted = false
+    const addModeContainer = () => {
+      modeContainer.hide()
+      if (game.gameType == SWAM.GAME_TYPE.CTF) {
+        $("#gamespecific > .redflag").before(modeContainer).css({left: 'calc(50% + 26px)'})
+        $("#gamespecific > .blueflag").css({right: 'calc(50% + 24px)'})
+      }
+    }
+    onSettingsUpdated('showBotMode',(showBotMode) => {
+      if (!showBotMode) {
+        leaderContainer.remove()
+        modeContainer.remove()
+        $("#roomname").show()
+        $("#gamespecific > .redflag").css({left:''})
+        $("#gamespecific > .blueflag").css({right:''})
+        return
+      }
+      if (hasStarted) {
+        addModeContainer()
+      }
+      modeContainer.hide().append(modeText).append(assistText)
+      $("#roomname").after(leaderContainer)
+
+      SWAM.on("leaderInfo", ({mode, leader, assist}) => {
+        $("#roomname").toggle(!(leader || mode))
+        if (leader) {
+          leaderContainer.text(leader.name).css({display: 'inline-block'})
+        } else {
+          leaderContainer.text("").css({display: 'hidden'})
+        }
+        if (mode) {
+          modeText.text(BOTS_MODE_SMALL_LABEL[mode] || mode)
+          modeContainer.css({display: 'inline-block', backgroundColor: MODE_COLORS[mode]}).show()
+        } else {
+          modeText.text("")
+          modeContainer.css({display: 'none'})
+        }
+        if (assist) {
+          assistText.text(assist).show()
+        } else {
+          assistText.text("").hide()
+        }
+      })
+
+      SWAM.on("playerAdded", (player) => {
+        if (player === Players.getMe()) {
+          hasStarted = true
+          addModeContainer()
+        }
+      })
+    })
+  })
+
+  /**
+   * Save chat size
+   */
+  SWAM.on("gameRunning", () => {
+    const savedChatboxSizeStr = localStorage.getItem("chatboxsize")
+    if (savedChatboxSizeStr) {
+      const {width,height} = JSON.parse(savedChatboxSizeStr)
+      const constrainedHeight = Math.min(parseInt(height),window.innerHeight-140)
+      $("#chatbox").css({width,height:constrainedHeight})
+      $("#minimizechatcontainer").css({width,bottom:constrainedHeight})
+      $("#chatinput").css({width,bottom: constrainedHeight + 20 + "px"})
+      $("#radioPanel").css({bottom: constrainedHeight + "px"})
+    }
+    $("#chatbox").on("mouseup", (e) => {
+      localStorage.setItem("chatboxsize", JSON.stringify({
+        width: e.currentTarget.style.width,
+        height: e.currentTarget.style.height
+      }))
+    })
+  })
+
+
+  /**
+   * Remove upgrades
+   */
+  SWAM.on("gameRunning", () => {
+    const prevUIUpdateUpgrades = UI.updateUpgrades
+    let prevIsZero = false
+
+    UI.updateUpgrades = (values,...rest) => {
+      const totalUpgs = values.reduce((a, b) => a + b, 0)
+      if (prevIsZero) {
+        if (totalUpgs === 20) {
+          $(".upgrade").hide()
+        } else {
+          $(".upgrade").show()
+        }
+      }
+      prevIsZero = totalUpgs === 0
+      prevUIUpdateUpgrades(values,...rest)
+    }
+  })
+
+
+  /**
+   * Add chat filter
+   */
+  /*SWAM.on("gameRunning", () => {
+    let filters = []
+    return false
+    const createFilter = (label) => {
+      return $(`<label style="background: black;padding: 3px;"><input type='checkbox' style='vertical-align: middle;margin-right: 3px;'>${label}</label>`)
+    }
+    const mentions = createFilter('Mention')
+    const pub = createFilter('Pub')
+    const whisper = createFilter('DM')
+    const bots = createFilter('Bots')
+    const team = createFilter('Team')
+    $("#minimizechatcontainer").prepend(mentions, pub, whisper, bots, team)
+  })*/
+
 
   /**
    *  utils
@@ -1011,12 +1320,14 @@ ${redPlayers.map(player =>
     return true;
   }
 
+  const unescapeHTML = (text) => text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#x27;/g, "'").replace(/&#x2F;/g, "/").replace(/&#x60;/g, "`")
+
   SWAM.registerExtension({
     name: "Starmash*",
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.11",
+    version: "1.2.12",
     settingsProvider: createSettingsProvider()
   });
 
