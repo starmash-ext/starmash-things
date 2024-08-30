@@ -130,7 +130,7 @@
     ) ||
     player.team > 2
   const isSpec = player =>
-    player.removedFromMap && (performance.now() - (player.lastKilled || 0)) > 5000
+    player.removedFromMap && (performance.now() - (player.lastKilled || 0)) > 3000
 
   const getPlaneGroups = () => {
     const players = Object.keys(Players.getIDs()).map(Players.get).filter(p => !isBot(p) && !isSpec(p))
@@ -215,6 +215,11 @@
             game.ping = Bt.ping
         };
         SWAM.on("scoreboardUpdate", updateTeamPlayers)
+        SWAM.on("playerAdded", (player) => {
+          if (player === Players.getMe()) {
+            currentTeamCount = ""
+          }
+        })
       } else {
         SWAM.off("scoreboardUpdate", updateTeamPlayers)
         UI.updateStats = originalUIUpdateStats;
@@ -509,14 +514,14 @@
               if (blueCarrier) {
                 const [bluesClose, redsClose] = getCloseToCarrier(Players.get(blueCarrier))
                 SWAM.trigger("carrierInfo",{plane:Players.get(blueCarrier).type,player:Players.get(blueCarrier),team: BLUE_TEAM,reds:redsClose,blues:bluesClose,hasCount:true})
-                document.getElementById("blueflag-name").querySelector(".blues-close").innerText = ` ${bluesClose.length} `
-                document.getElementById("blueflag-name").querySelector(".reds-close").innerText = ` ${redsClose.length} `
+                document.getElementById("blueflag-name").querySelector(".blues-close").innerText = ` ${bluesClose?.length} `
+                document.getElementById("blueflag-name").querySelector(".reds-close").innerText = ` ${redsClose?.length} `
               }
               if (redCarrier) {
                 const [bluesClose, redsClose] = getCloseToCarrier(Players.get(redCarrier))
                 SWAM.trigger("carrierInfo",{plane:Players.get(redCarrier).type,player:Players.get(redCarrier),team:RED_TEAM,reds:redsClose,blues:bluesClose,hasCount:true})
-                document.getElementById("redflag-name").querySelector(".blues-close").innerText = ` ${bluesClose.length} `
-                document.getElementById("redflag-name").querySelector(".reds-close").innerText = ` ${redsClose.length} `
+                document.getElementById("redflag-name").querySelector(".blues-close").innerText = ` ${bluesClose?.length} `
+                document.getElementById("redflag-name").querySelector(".reds-close").innerText = ` ${redsClose?.length} `
               }
             }
           }
@@ -1017,10 +1022,11 @@ ${redPlayers.map(player =>
     }
     SWAM.on("chatLineAdded",(player,text,type) => {
       if (text.indexOf("#assist")>=0) {
+        lastCommandLinePlayer = player
         lastAssistLine = unescapeHTML(text);
         return;
       }
-      if (['#cap','#recap','#recover','#buddy','#defend','#auto','#storm'].indexOf(text)>=0 || text.indexOf("#assist ")>=0) {
+      if (['#cap','#recap','#recover','#buddy','#defend','#auto','#storm'].indexOf(text)>=0) {
         lastCommandLinePlayer = player
         return
       }
@@ -1327,7 +1333,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.13",
+    version: "1.2.14",
     settingsProvider: createSettingsProvider()
   });
 
