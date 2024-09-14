@@ -28,7 +28,10 @@
     },
     botsColor: true,
     dropFlagKey: 'Y',
-    dropUpgKey: ''
+    dropUpgKey: '',
+    chatRadioKey:'Z',
+    teamRadioKey: 'X',
+    sayRadioKey: 'C'
   };
   const BLUE_TEAM = 1
   const RED_TEAM = 2
@@ -66,12 +69,17 @@
     const miscSection = sp.addSection("Miscellaneous");
     miscSection.addBoolean("fixHud", "Fix HUD on map edge (needs page reload)");
     miscSection.addBoolean("keepFiringWhileTyping", "Keep firing while typing (except stealthed prowler)");
-    miscSection.addString("dropFlagKey", "CTF drop key.");
-    miscSection.addString("dropUpgKey", "Drop upgrade key.");
     miscSection.addBoolean("botsColor", "Bots have different color on minimap");
     miscSection.addBoolean("addPlaneTypeToScoreboard", "Add player plane type on scoreboard");
     miscSection.addBoolean("nameOnProwlerRadar", "Add names on prowler radar");
     miscSection.addBoolean("selfProwlerRadar", "Add self radar to prowler (what radar players are seeing)");
+
+    const keyBindings = sp.addSection("Key Bindings");
+    keyBindings.addString("dropFlagKey", "CTF drop key.");
+    keyBindings.addString("dropUpgKey", "Drop upgrade key.");
+    keyBindings.addString("chatRadioKey", "Chat radio key");
+    keyBindings.addString("teamRadioKey", "Team radio key");
+    keyBindings.addString("sayRadioKey", "Close range radio key");
 
     const ctfSection = sp.addSection("CTF Options");
     ctfSection.addBoolean("showBotMode", "Show bot mode (cap,rec...) on top of the screen");
@@ -1229,6 +1237,32 @@ ${redPlayers.map(player =>
   })
 
   /**
+   * Add flag/leader to nameplate, remove health
+   */
+  //SWAM.updatePlayersNamePlate = () => {}
+  SWAM.on("gameRunning", () => {
+    console.log(SWAM.resizeMap,SWAM.PlayerInfoTimer)
+    clearInterval(SWAM.PlayerInfoTimer)
+    /*function ResizeNamePlates(Bt) {
+      let Gt = Math.round(22 * Bt / 2500) + "px"
+      config.playerNameSize = Gt
+      if (game.state == Network.STATE.PLAYING) {
+        let Yt = Players.getIDs();
+        for (let jt in Yt) {
+          var Ht = Players.get(jt);
+          Ht.sprites.name.style.fontSize = Gt
+        }
+      }
+    }
+    SWAM.resizeMap = function (Bt) {
+      config.scalingFactor = Bt
+      Graphics.resizeRenderer(window.innerWidth, window.innerHeight)
+      ResizeNamePlates(Bt)
+    }*/
+  })
+
+
+  /**
    * Save chat size
    */
   SWAM.on("gameRunning", () => {
@@ -1271,6 +1305,37 @@ ${redPlayers.map(player =>
     }
   })
 
+
+  /**
+   * Radio keybindings
+   */
+
+  SWAM.on("gameRunning", function () {
+    const originalSwamRadioHandleKeys = SWAM.radio.handle_keys
+    onSettingsUpdated(['chatRadioKey','teamRadioKey','sayRadioKey'], ({chatRadioKey,teamRadioKey,sayRadioKey}) => {
+      const mapping = {
+        [chatRadioKey.toLowerCase()]: 90,
+        [teamRadioKey.toLowerCase()]: 88,
+        [sayRadioKey.toLowerCase()]: 67
+      }
+      SWAM.radio.handle_keys = (e) => {
+        if ([90, 88, 67].indexOf(e.which) >= 0 && !mapping[e.key.toLowerCase()]) {
+          return;
+        }
+        if (mapping[e.key.toLowerCase()]) {
+          originalSwamRadioHandleKeys(
+            {
+              which: mapping[e.key],
+              preventDefault: e.preventDefault,
+              stopPropagation: e.stopPropagation,
+              stopImmediatePropagation: e.stopImmediatePropagation
+            })
+        } else {
+          originalSwamRadioHandleKeys(e)
+        }
+      }
+    })
+  });
 
   /**
    * Add chat filter
@@ -1333,7 +1398,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.14",
+    version: "1.2.15",
     settingsProvider: createSettingsProvider()
   });
 
