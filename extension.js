@@ -1325,7 +1325,7 @@ ${redPlayers.map(player =>
         if (mapping[e.key.toLowerCase()]) {
           originalSwamRadioHandleKeys(
             {
-              which: mapping[e.key],
+              which: mapping[e.key.toLowerCase()],
               preventDefault: e.preventDefault,
               stopPropagation: e.stopPropagation,
               stopImmediatePropagation: e.stopImmediatePropagation
@@ -1398,7 +1398,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.15",
+    version: "1.2.16",
     settingsProvider: createSettingsProvider()
   });
 
