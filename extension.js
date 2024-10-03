@@ -148,6 +148,12 @@
       return acc
     }, {})
   }
+  const getFastBots = () => {
+    const botsOn5555 = Object.keys(Players.getIDs()).map(Players.get).filter(p => isBot(p) && p.speedupgrade === 5)
+    const blue5555 = botsOn5555.filter(({team}) => team === 1)
+    const red5555 = botsOn5555.filter(({team}) => team === 2)
+    return [blue5555,red5555]
+  }
 
   /**
    * Remove up/down chat input
@@ -807,12 +813,29 @@ ${redPlayers.map(player =>
           })
         }
       }
+      const spacer = $("#sidebar .spacer")
+      const fastBots = () => {
+        spacer.empty().css({minHeight:"14px",height:"auto"})
+        if (game.gameType == SWAM.GAME_TYPE.CTF) {
+          const [blue5555,red5555] = getFastBots()
+          if (blue5555.length) {
+            const S = blue5555.length === 1 ? "" : "S"
+            spacer.append(`<div style='color: ${BLUE_COLOR};font-size: 12px;text-align: center;'>${blue5555.length} FAST BOT${S}</div>`)
+          }
+          if (red5555.length) {
+            const S = red5555.length === 1 ? "" : "S"
+            spacer.append(`<div style='color: ${RED_COLOR};font-size: 12px;text-align: center;'>${red5555.length} FAST BOT${S}</div>`)
+          }
+        }
+      }
       if (isEnabled) {
         $(".aircraft").on("mouseenter",handleMouseEnter).on("mouseleave",handleMouseLeave)
         SWAM.on("scoreboardUpdate", updatePlaneCount)
+        SWAM.on("scoreboardUpdate",fastBots)
       } else {
         $(".aircraft").off("mouseenter",handleMouseEnter).off("mouseleave",handleMouseLeave)
         SWAM.off("scoreboardUpdate", updatePlaneCount)
+        SWAM.off("scoreboardUpdate",fastBots)
       }
     }
     onSettingsUpdated('showPlaneCount', toggle)
@@ -983,9 +1006,11 @@ ${redPlayers.map(player =>
           (capInfo.hasCount ? ` Nearby 👨🏻[${bluePlayers}${getEmojiColor(bluePlayers,redPlayers)}${redPlayers}] 🤖[${blueBots}${getEmojiColor(blueBots,redBots)}${redBots}]` : "") : ``
       })
       .replace(/\$PLANES|\$SHIPS/i,() => {
+        const [blue5555,red5555] = getFastBots()
         return Object.entries(getPlaneGroups())
         .sort(([planeA],[planeB]) => planeA > planeB ? 1 : -1)
         .map(([plane,[blue,red]]) => `${PLANE_LABELS[plane]?.toLowerCase()}[${blue}${getEmojiColor(blue,red)}${red}]`)
+        .concat((blue5555.length || red5555.length) ? [`🚀🤖[${blue5555.length}${getEmojiColor(blue5555.length,red5555.length)}${red5555.length}]`] : [])
         .join(" ")
       })
     }
@@ -1025,9 +1050,7 @@ ${redPlayers.map(player =>
     let currentAssisted = null;
     let lastCommandLinePlayer = null
     let lastAssistLine = '';
-    const getPlayerByName = (name) => {
-      return Object.keys(Players.getIDs()).map(Players.get).find(p => p.name === name)
-    }
+
     SWAM.on("chatLineAdded",(player,text,type) => {
       if (text.indexOf("#assist")>=0) {
         lastCommandLinePlayer = player
@@ -1040,21 +1063,21 @@ ${redPlayers.map(player =>
       }
       if (isBot(player)) {
         if (text.indexOf(" is still the team leader.")>0) {
-          currentLeader = getPlayerByName(text.replace(" is still the team leader.",""))
+          currentLeader = Players.getByName(text.replace(" is still the team leader.",""))
         } else if (text.indexOf(' has been chosen as the new team leader.')>=0) {
           currentMode = 'auto';
           currentAssisted = null
-          currentLeader = getPlayerByName(text.replace(' has been chosen as the new team leader.',''))
+          currentLeader = Players.getByName(text.replace(' has been chosen as the new team leader.',''))
         } else if (text.indexOf(' the new team leader.')>=0 && text.indexOf("#yes") < 0) {
           currentMode = 'auto';
           currentAssisted = null
-          currentLeader = getPlayerByName(text.replace(/^.* has made (.*) the new team leader\.$/,'$1'))
+          currentLeader = Players.getByName(text.replace(/^.* has made (.*) the new team leader\.$/,'$1'))
         } else if (text.indexOf('The blue team has 6 bots in ')===0) {
           currentMode = text.split('The blue team has 6 bots in ')[1].split(' ')[0]
-          currentLeader = getPlayerByName(text.split('controlled by ')[1].replace(/\.$/,''))
+          currentLeader = Players.getByName(text.split('controlled by ')[1].replace(/\.$/,''))
         } else if (text.indexOf('The red team has 6 bots in ')===0) {
           currentMode = text.split('The red team has 6 bots in ')[1].split(' ')[0]
-          currentLeader = getPlayerByName(text.split('controlled by ')[1].replace(/\.$/,''))
+          currentLeader = Players.getByName(text.split('controlled by ')[1].replace(/\.$/,''))
         } else {
           switch (text) {
             case 'Bots will storm the base in 60 seconds!':
@@ -1337,6 +1360,7 @@ ${redPlayers.map(player =>
     })
   });
 
+
   /**
    * Add chat filter
    */
@@ -1398,7 +1422,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.16",
+    version: "1.2.17",
     settingsProvider: createSettingsProvider()
   });
 
