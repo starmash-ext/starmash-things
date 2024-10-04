@@ -31,7 +31,8 @@
     dropUpgKey: '',
     chatRadioKey:'Z',
     teamRadioKey: 'X',
-    sayRadioKey: 'C'
+    sayRadioKey: 'C',
+    missileSize: 100
   };
   const BLUE_TEAM = 1
   const RED_TEAM = 2
@@ -74,6 +75,14 @@
     miscSection.addBoolean("nameOnProwlerRadar", "Add names on prowler radar");
     miscSection.addBoolean("selfProwlerRadar", "Add self radar to prowler (what radar players are seeing)");
 
+    const themeSection = sp.addSection("Theme specific");
+    themeSection.addSliderField("missileSize", "[HitCircles] Adjust Missile Size (in %)", {
+      min: 50,
+      max: 500,
+      step: 50
+    });
+    themeSection.addBoolean("selfMinimapDot", "[Vanilla] Replaces white rectangle of minimap for small dot");
+
     const keyBindings = sp.addSection("Key Bindings");
     keyBindings.addString("dropFlagKey", "CTF drop key.");
     keyBindings.addString("dropUpgKey", "Drop upgrade key.");
@@ -87,7 +96,6 @@
     ctfSection.addBoolean("fixPlayerCount", "Improve CTF team player count");
     ctfSection.addBoolean("respawnLines", "Add CTF respawn lines");
     ctfSection.addBoolean("respawnLinesMinimap", "[Minimap] Add CTF respawn lines to minimap");
-    ctfSection.addBoolean("selfMinimapDot", "[Minimap] Replaces white rectangle of minimap for small dot (for Vanilla Themes)");
     ctfSection.addBoolean("removeBotsScoreboard", "Remove bots from scoreboard");
     ctfSection.addBoolean("ctfEndFx", "Fireworks/color overlay for CTF match end");
     ctfSection.addValuesField("carrier", "Display CTF carrier type ($CAP and $REC to send in chat)",
@@ -448,6 +456,29 @@
         game.graphics.gui.minimap_box.texture = minimapBoxTexture
       } else {
         game.graphics.gui.minimap_box.texture = originalMinimapBoxTexture
+      }
+    })
+  })
+
+  /**
+   * HitCircles missile size
+   */
+  SWAM.on("gameRunning", function() {
+    const originalMobScaler = SWAM.Theme?._getMobScale
+    onSettingsUpdated('missileSize',(missileSize) => {
+      if (SWAM.Theme?._getMobScale) {
+        if (missileSize !== 100) {
+          const missileSizeMultiplier = missileSize / 100
+          SWAM.Theme._getMobScale = (mob) => {
+            return mob.type === 2
+              ? [.2 * missileSizeMultiplier, .2 * missileSizeMultiplier]
+              : mob.type === 3
+                ? [.2 * missileSizeMultiplier, .2 * missileSizeMultiplier]
+                : [.2 * missileSizeMultiplier, .15 * missileSizeMultiplier];
+          }
+        } else {
+          SWAM.Theme._getMobScale = originalMobScaler
+        }
       }
     })
   })
@@ -1422,7 +1453,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.17",
+    version: "1.2.18",
     settingsProvider: createSettingsProvider()
   });
 
