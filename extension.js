@@ -6,7 +6,7 @@
     respawnLinesMinimap: true,
     fixHud: true,
     selfMinimapDot: false,
-    keepFiringWhileTyping:true,
+    keepFiringWhileTyping:false,
     carrier: 'count',
     showPlaneCount:true,
     ctfEndFx: false,
@@ -32,7 +32,9 @@
     chatRadioKey:'Z',
     teamRadioKey: 'X',
     sayRadioKey: 'C',
-    missileSize: 100
+    missileSize: 100,
+    vanillaFont: true,
+    resizeNameplate: false
   };
   const BLUE_TEAM = 1
   const RED_TEAM = 2
@@ -75,7 +77,9 @@
     miscSection.addBoolean("nameOnProwlerRadar", "Add names on prowler radar");
     miscSection.addBoolean("selfProwlerRadar", "Add self radar to prowler (what radar players are seeing)");
 
-    const themeSection = sp.addSection("Theme specific");
+    const themeSection = sp.addSection("Theme/Style");
+    themeSection.addBoolean("vanillaFont", "Use original text font for chat/leaderboard");
+    themeSection.addBoolean("resizeNameplate", "Keep nameplate size on zoom change");
     themeSection.addSliderField("missileSize", "[HitCircles] Adjust Missile Size (in %)", {
       min: 50,
       max: 500,
@@ -362,11 +366,6 @@
 
       const previousPlayersUpdate = Players.update
       const originalUIResizeHUD = UI.resizeHUD
-
-      Graphics.render = function () {
-        Graphics.renderer.render(game.graphics.layers.shadows, game.graphics.gui.shadows, true),
-          Graphics.renderer.render(game.graphics.layers.game)
-      };
 
       const sourceOrig = game.graphics.gui.hudHealth_mask.texture.orig
       const image = game.graphics.gui.hudHealth_mask.texture.baseTexture.source;
@@ -1291,28 +1290,62 @@ ${redPlayers.map(player =>
   })
 
   /**
+   * Font
+   */
+  SWAM.on("gameRunning", () => {
+    let ModStyles = $("#ModStyles")
+    let originalModStyles
+    onSettingsUpdated("vanillaFont", (vanillaFont) => {
+      if (vanillaFont) {
+        const toRemove = [45,27]
+        originalModStyles = ModStyles.clone()
+        const styleSheet = Array.from(document.styleSheets).find(e => e.ownerNode === ModStyles[0])
+        toRemove.forEach(i => styleSheet.deleteRule(i))
+      } else if (originalModStyles) {
+        ModStyles.remove()
+        originalModStyles.appendTo("body")
+        ModStyles = originalModStyles
+      }
+    })
+  })
+
+  /**
    * Add flag/leader to nameplate, remove health
    */
-  //SWAM.updatePlayersNamePlate = () => {}
   SWAM.on("gameRunning", () => {
-    console.log(SWAM.resizeMap,SWAM.PlayerInfoTimer)
-    clearInterval(SWAM.PlayerInfoTimer)
-    /*function ResizeNamePlates(Bt) {
-      let Gt = Math.round(22 * Bt / 2500) + "px"
-      config.playerNameSize = Gt
-      if (game.state == Network.STATE.PLAYING) {
+    SWAM.on("gamePrep",() => clearInterval(SWAM.PlayerInfoTimer))
+    let ResizeNamePlates = (Bt) =>{
+      let Gt = Math.round(25 * Bt / 2500) + "px"
+        , Xt = Math.round(20 * Bt / 2500) + "px";
+      if (config.playerNameSize = Gt,
+        config.playerLevelSize = Xt,
+      game.state == Network.STATE.PLAYING) {
         let Yt = Players.getIDs();
         for (let jt in Yt) {
           var Ht = Players.get(jt);
-          Ht.sprites.name.style.fontSize = Gt
+          Ht.sprites.name.style.fontSize = Gt,
+          Ht.sprites.level && (Ht.sprites.level.style.fontSize = Xt)
         }
       }
     }
-    SWAM.resizeMap = function (Bt) {
-      config.scalingFactor = Bt
-      Graphics.resizeRenderer(window.innerWidth, window.innerHeight)
-      ResizeNamePlates(Bt)
-    }*/
+
+    onSettingsUpdated('resizeNameplate',(resizeNameplate) => {
+      if (resizeNameplate) {
+        SWAM.resizeMap = function(Bt) {
+          config.scalingFactor = Bt,
+            Graphics.resizeRenderer(window.innerWidth, window.innerHeight),
+            ResizeNamePlates(Bt)
+        }
+        SWAM.resizeMap(config.scalingFactor)
+      } else {
+        SWAM.resizeMap = function(Bt) {
+          config.scalingFactor = Bt,
+            Graphics.resizeRenderer(window.innerWidth, window.innerHeight),
+            ResizeNamePlates(3500)
+        }
+        SWAM.resizeMap(config.scalingFactor)
+      }
+    })
   })
 
 
@@ -1453,7 +1486,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.18",
+    version: "1.2.19",
     settingsProvider: createSettingsProvider()
   });
 
