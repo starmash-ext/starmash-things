@@ -81,9 +81,9 @@
     themeSection.addBoolean("vanillaFont", "Use original text font for chat/leaderboard");
     themeSection.addBoolean("resizeNameplate", "Keep nameplate size on zoom change");
     themeSection.addSliderField("missileSize", "Adjust Missile Size (in %)", {
-      min: 50,
-      max: 500,
-      step: 50
+      min: 10,
+      max: 400,
+      step: 10
     });
     themeSection.addBoolean("selfMinimapDot", "[Vanilla] Replaces white rectangle of minimap for small dot");
 
