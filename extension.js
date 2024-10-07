@@ -527,8 +527,8 @@
 
       if ( ![ 1, 2, 3, 5, 6, 7 ].includes ( mob.type ) ) return;
       const scale = getMobScale ( mob )
-      mob.sprites.thruster.scale.set( ...scale );
-      mob.sprites.thrusterGlow.scale.set( ...scale );
+      // mob.sprites.thruster.scale.set( ...scale );
+      // mob.sprites.thrusterGlow.scale.set( ...scale );
       mob.sprites.shadow.scale.set( ...scale );
       if (SWAM.Theme?._getMobScale && game.gameType === 2) return;
       mob.sprites.sprite.scale.set( ...scale );
@@ -536,16 +536,16 @@
 
 
     onSettingsUpdated(['missileSize','missilePointerSize'],({missileSize,missilePointerSize}) => {
-      missileSizeRef.current = missileSize
+      missileSizeRef.current = Number(missileSize)
       // missilePointerSizeRef.current = missilePointerSize
       if (SWAM.Theme?._getMobScale) {
-        if (missileSize !== 100) {
+        if (Number(missileSize) !== 100) {
           SWAM.Theme._getMobScale = getMobScale
         } else {
           SWAM.Theme._getMobScale = originalMobScaler
         }
       }
-      if (missileSize !== 100) {
+      if (Number(missileSize) !== 100) {
         SWAM.on('mobAdded', deferredUpdateMissileSize);
       } else {
         SWAM.off('mobAdded', deferredUpdateMissileSize);
@@ -1570,7 +1570,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.21",
+    version: "1.2.22",
     settingsProvider: createSettingsProvider()
   });
 
