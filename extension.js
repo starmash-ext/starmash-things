@@ -33,6 +33,7 @@
     teamRadioKey: 'X',
     sayRadioKey: 'C',
     missileSize: 100,
+    missilePointerSize: 0,
     vanillaFont: true,
     resizeNameplate: false
   };
@@ -76,6 +77,11 @@
     miscSection.addBoolean("addPlaneTypeToScoreboard", "Add player plane type on scoreboard");
     miscSection.addBoolean("nameOnProwlerRadar", "Add names on prowler radar");
     miscSection.addBoolean("selfProwlerRadar", "Add self radar to prowler (what radar players are seeing)");
+    /*miscSection.addSliderField("missilePointerSize", "Add a pointer in front of missile, to know where it will go", {
+      min: 0,
+      max: 1000,
+      step: 50
+    });*/
 
     const themeSection = sp.addSection("Theme/Style");
     themeSection.addBoolean("vanillaFont", "Use original text font for chat/leaderboard");
@@ -463,9 +469,42 @@
    * HitCircles missile size
    */
   SWAM.on("gameRunning", function() {
+    // const MisslePointerTexture = (function createMissilePointerTexture() {
+    //   const width = 1;  // Width of the rectangle
+    //   const height = 500; // Height of the rectangle
+    //   const canvas = document.createElement('canvas');
+    //   canvas.width = width;
+    //   canvas.height = height;
+    //   const ctx = canvas.getContext('2d');
+    //   const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    //   gradient.addColorStop(0, 'rgba(255, 255, 255, 1)'); // White
+    //   gradient.addColorStop(1, 'rgba(255, 255, 255, 0)'); // Transparent
+    //   ctx.fillStyle = gradient;
+    //   ctx.fillRect(0, 0, width, height);
+    //   return PIXI.Texture.from(canvas);
+    // })()
+
+
     let missileSizeRef = {current: 100}
+    // let missilePointerSizeRef = {current: 0}
     const originalMobScaler = SWAM.Theme?._getMobScale
+
     const deferredUpdateMissileSize = ( ...args ) => setTimeout ( () => updateMissileSize( ...args ) )
+    // const addMissilePointer = (mob,player) => {
+    //   if (!missilePointerSizeRef.current) return
+    //   const missilePointer = new PIXI.Sprite(MisslePointerTexture);
+    //   missilePointer.rotation = Math.PI;
+    //   const w = 2 / game.graphics.layers.groundobjects.scale.x
+    //   missilePointer.x = w/2
+    //   missilePointer.width = w
+    //   missilePointer.height = missilePointerSizeRef.current
+    //   missilePointer.alpha = 0.3
+    //   if (SWAM.Theme?._getThrusterTint) {
+    //     missilePointer.tint = SWAM.Theme._getThrusterTint(player)
+    //   }
+    //   mob.sprites.sprite.addChild(missilePointer)
+    // }
+
     const getMobScale = (mob) => {
       const missileSizeMultiplier = missileSizeRef.current / 100
 
@@ -475,19 +514,30 @@
           ? [.2 * missileSizeMultiplier, .2 * missileSizeMultiplier]
           : [.2 * missileSizeMultiplier, .15 * missileSizeMultiplier];
     }
-    const updateMissileSize = (data) => {
-      if (SWAM.Theme?._getMobScale && game.gameType === 2) return;
+
+
+
+    const updateMissileSize = (data,ex,playerId) => {
       let mob = Mobs.get ( data.id );
+      let player = Players.get ( playerId );
       if ( !mob ) return;
+      // if (missilePointerSizeRef.current > 0) {
+      //   addMissilePointer(mob, player)
+      // }
 
       if ( ![ 1, 2, 3, 5, 6, 7 ].includes ( mob.type ) ) return;
-
-      mob.sprites.sprite.scale.set ( ...getMobScale ( mob ) );
-
+      const scale = getMobScale ( mob )
+      mob.sprites.thruster.scale.set( ...scale );
+      mob.sprites.thrusterGlow.scale.set( ...scale );
+      mob.sprites.shadow.scale.set( ...scale );
+      if (SWAM.Theme?._getMobScale && game.gameType === 2) return;
+      mob.sprites.sprite.scale.set( ...scale );
     }
 
-    onSettingsUpdated('missileSize',(missileSize) => {
+
+    onSettingsUpdated(['missileSize','missilePointerSize'],({missileSize,missilePointerSize}) => {
       missileSizeRef.current = missileSize
+      // missilePointerSizeRef.current = missilePointerSize
       if (SWAM.Theme?._getMobScale) {
         if (missileSize !== 100) {
           SWAM.Theme._getMobScale = getMobScale
@@ -1318,7 +1368,7 @@ ${redPlayers.map(player =>
     let originalModStyles
     onSettingsUpdated("vanillaFont", (vanillaFont) => {
       if (vanillaFont) {
-        const toRemove = [45,27]
+        const toRemove = [45, 27, 27]
         originalModStyles = ModStyles.clone()
         const styleSheet = Array.from(document.styleSheets).find(e => e.ownerNode === ModStyles[0])
         toRemove.forEach(i => styleSheet.deleteRule(i))
@@ -1334,7 +1384,20 @@ ${redPlayers.map(player =>
    * Add flag/leader to nameplate, remove health
    */
   SWAM.on("gameRunning", () => {
-    SWAM.on("gamePrep",() => clearInterval(SWAM.PlayerInfoTimer))
+    SWAM.on("gamePrep",() => {
+      clearInterval(SWAM.PlayerInfoTimer)
+      const updatePlayersNamePlate = function() {
+        var Bt = Players.getIDs()
+          , Gt = Players.getMe();
+        for (var Xt in Bt) {
+          var Yt = Players.get(Xt);
+          "undefined" != typeof Yt.scorePlace && (Yt.sprites.name.text = Yt.scorePlace + ". " + Yt.name)
+        }
+      }
+      SWAM.PlayerInfoTimer = setInterval(updatePlayersNamePlate, 500)
+    })
+
+
     let ResizeNamePlates = (Bt) =>{
       let Gt = Math.round(25 * Bt / 2500) + "px"
         , Xt = Math.round(20 * Bt / 2500) + "px";
@@ -1507,7 +1570,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.20",
+    version: "1.2.21",
     settingsProvider: createSettingsProvider()
   });
 
