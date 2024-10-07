@@ -80,7 +80,7 @@
     const themeSection = sp.addSection("Theme/Style");
     themeSection.addBoolean("vanillaFont", "Use original text font for chat/leaderboard");
     themeSection.addBoolean("resizeNameplate", "Keep nameplate size on zoom change");
-    themeSection.addSliderField("missileSize", "[HitCircles] Adjust Missile Size (in %)", {
+    themeSection.addSliderField("missileSize", "Adjust Missile Size (in %)", {
       min: 50,
       max: 500,
       step: 50
@@ -463,21 +463,42 @@
    * HitCircles missile size
    */
   SWAM.on("gameRunning", function() {
+    let missileSizeRef = {current: 100}
     const originalMobScaler = SWAM.Theme?._getMobScale
+    const deferredUpdateMissileSize = ( ...args ) => setTimeout ( () => updateMissileSize( ...args ) )
+    const getMobScale = (mob) => {
+      const missileSizeMultiplier = missileSizeRef.current / 100
+
+      return mob.type === 2
+        ? [.2 * missileSizeMultiplier, .2 * missileSizeMultiplier]
+        : mob.type === 3
+          ? [.2 * missileSizeMultiplier, .2 * missileSizeMultiplier]
+          : [.2 * missileSizeMultiplier, .15 * missileSizeMultiplier];
+    }
+    const updateMissileSize = (data) => {
+      if (SWAM.Theme?._getMobScale && game.gameType === 2) return;
+      let mob = Mobs.get ( data.id );
+      if ( !mob ) return;
+
+      if ( ![ 1, 2, 3, 5, 6, 7 ].includes ( mob.type ) ) return;
+
+      mob.sprites.sprite.scale.set ( ...getMobScale ( mob ) );
+
+    }
+
     onSettingsUpdated('missileSize',(missileSize) => {
+      missileSizeRef.current = missileSize
       if (SWAM.Theme?._getMobScale) {
         if (missileSize !== 100) {
-          const missileSizeMultiplier = missileSize / 100
-          SWAM.Theme._getMobScale = (mob) => {
-            return mob.type === 2
-              ? [.2 * missileSizeMultiplier, .2 * missileSizeMultiplier]
-              : mob.type === 3
-                ? [.2 * missileSizeMultiplier, .2 * missileSizeMultiplier]
-                : [.2 * missileSizeMultiplier, .15 * missileSizeMultiplier];
-          }
+          SWAM.Theme._getMobScale = getMobScale
         } else {
           SWAM.Theme._getMobScale = originalMobScaler
         }
+      }
+      if (missileSize !== 100) {
+        SWAM.on('mobAdded', deferredUpdateMissileSize);
+      } else {
+        SWAM.off('mobAdded', deferredUpdateMissileSize);
       }
     })
   })
@@ -1486,7 +1507,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.19",
+    version: "1.2.20",
     settingsProvider: createSettingsProvider()
   });
 
