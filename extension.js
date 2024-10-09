@@ -33,7 +33,7 @@
     teamRadioKey: 'X',
     sayRadioKey: 'C',
     missileSize: 100,
-    missilePointerSize: 0,
+    // missilePointerSize: 0,
     vanillaFont: true,
     resizeNameplate: false
   };
@@ -77,11 +77,11 @@
     miscSection.addBoolean("addPlaneTypeToScoreboard", "Add player plane type on scoreboard");
     miscSection.addBoolean("nameOnProwlerRadar", "Add names on prowler radar");
     miscSection.addBoolean("selfProwlerRadar", "Add self radar to prowler (what radar players are seeing)");
-    miscSection.addSliderField("missilePointerSize", "Add a pointer in front of missile, to know where it will go", {
+    /*miscSection.addSliderField("missilePointerSize", "Add a pointer in front of missile, to know where it will go", {
       min: 0,
       max: 1000,
       step: 50
-    });
+    });*/
 
     const themeSection = sp.addSection("Theme/Style");
     themeSection.addBoolean("vanillaFont", "Use original text font for chat/leaderboard");
@@ -525,7 +525,7 @@
       let player = Players.get ( playerId );
       if ( !mob ) return;
       if ( ![ 1, 2, 3, 5, 6, 7 ].includes ( mob.type ) ) return;
-      if (missilePathRef.current > 0) {
+      /*if (missilePathRef.current > 0) {
         mob.originalPos = mob.pos;
         if (mob.constructor.prototype.updateGraphics !== updateMissilePointerGraphics) {
           const originalUpdateGraphics = mob.constructor.prototype.updateGraphics
@@ -545,7 +545,7 @@
           }
         }
         mob.missilePath = addMissilePath(mob, player)
-      }
+      }*/
 
       const scale = getMobScale ( mob )
       // mob.sprites.thruster.scale.set( ...scale );
@@ -1597,7 +1597,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.23",
+    version: "1.2.24",
     settingsProvider: createSettingsProvider()
   });
 
