@@ -35,7 +35,11 @@
     missileSize: 100,
     // missilePointerSize: 0,
     vanillaFont: true,
-    resizeNameplate: false
+    resizeNameplate: false,
+    energyCircleColor: '#1F32A1',
+    healthGlowStrength: 2,
+    selfEnergyCircle: true,
+    selfHealthGlow: true
   };
   const BLUE_TEAM = 1
   const RED_TEAM = 2
@@ -82,6 +86,16 @@
       max: 1000,
       step: 50
     });*/
+    const planeHealthEnergySections = sp.addSection("Planes Health/Energy");
+    planeHealthEnergySections.addString("energyCircleColor", "Low energy circle when can't fire missile. Color in HEX, ex: #1F32A1 (empty to disable)")
+    planeHealthEnergySections.addSliderField("healthGlowStrength", "Health glow strength (yellow dies to pred, red to heli, 0 to disable)", {
+      min:0,
+      max: 5,
+      step: 0.1
+    })
+    planeHealthEnergySections.addBoolean("selfEnergyCircle", "Show energy circle for self");
+    planeHealthEnergySections.addBoolean("selfHealthGlow", "Show health glow for self");
+
 
     const themeSection = sp.addSection("Theme/Style");
     themeSection.addBoolean("vanillaFont", "Use original text font for chat/leaderboard");
@@ -269,29 +283,18 @@
     const {height: minimapHeight,width: minimapWidth} = game.graphics.gui.minimap.getLocalBounds()
 
 
-    const createSprite = ({color,x,y, height,width, alpha = 0.3}) => {
-      var sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
-      sprite.tint = color; //Change with the color wanted
-      sprite.alpha = alpha;
-      sprite.width = width;
-      sprite.height = height;
-      sprite.x = x
-      sprite.y = y
-      sprite.roundPixels = true
-      return sprite
-    }
 
     const minimapOffsetY = 512*minimapHeight/config.mapHeight
     const minimapOffsetX = 1024*minimapWidth/config.mapWidth
-    const blueXSpawnMinimap = createSprite({color:0x0000FF, x:-minimapWidth/2,y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 1})
-    const redXSpawnMinimap = createSprite({color:0xFF0000, x:-minimapOffsetX - (minimapWidth/2),y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 1})
-    const blueYSpawnMinimap = createSprite({color:0x0000FF, y:-minimapHeight/2, x:-minimapWidth/2,  width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 1})
-    const redYSpawnMinimap = createSprite({color:0xFF0000, y:-minimapOffsetY - minimapHeight/2, x:-minimapOffsetX - minimapWidth,width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 1})
+    const blueXSpawnMinimap = createRectangleSprite({color:0x0000FF, x:-minimapWidth/2,y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 1})
+    const redXSpawnMinimap = createRectangleSprite({color:0xFF0000, x:-minimapOffsetX - (minimapWidth/2),y:-minimapHeight, height:minimapHeight,width:1/game.graphics.gui.minimap.scale.x,alpha: 1})
+    const blueYSpawnMinimap = createRectangleSprite({color:0x0000FF, y:-minimapHeight/2, x:-minimapWidth/2,  width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 1})
+    const redYSpawnMinimap = createRectangleSprite({color:0xFF0000, y:-minimapOffsetY - minimapHeight/2, x:-minimapOffsetX - minimapWidth,width:minimapWidth/2,height:1/game.graphics.gui.minimap.scale.y,alpha: 1})
 
-    const blueXSpawn = createSprite({color:0x0000FF, x:0,y:-config.mapHeight/2, height:config.mapHeight,width:1/game.graphics.layers.groundobjects.scale.x})
-    const redXSpawn = createSprite({color:0xFF0000, x:-1024,y:-config.mapHeight/2, height:config.mapHeight,width:1/game.graphics.layers.groundobjects.scale.x})
-    const blueYSpawn = createSprite({color:0x0000FF, y:0, x:0,  width:config.mapWidth/2,height:1/game.graphics.layers.groundobjects.scale.y})
-    const redYSpawn = createSprite({color:0xFF0000, y:-512, x:-1024 - config.mapWidth/2,width:config.mapWidth/2,height:1/game.graphics.layers.groundobjects.scale.y})
+    const blueXSpawn = createRectangleSprite({color:0x0000FF, x:0,y:-config.mapHeight/2, height:config.mapHeight,width:1/game.graphics.layers.groundobjects.scale.x})
+    const redXSpawn = createRectangleSprite({color:0xFF0000, x:-1024,y:-config.mapHeight/2, height:config.mapHeight,width:1/game.graphics.layers.groundobjects.scale.x})
+    const blueYSpawn = createRectangleSprite({color:0x0000FF, y:0, x:0,  width:config.mapWidth/2,height:1/game.graphics.layers.groundobjects.scale.y})
+    const redYSpawn = createRectangleSprite({color:0xFF0000, y:-512, x:-1024 - config.mapWidth/2,width:config.mapWidth/2,height:1/game.graphics.layers.groundobjects.scale.y})
 
     const onRenderResized = async function () {
       redXSpawn.width = 1 / game.graphics.layers.groundobjects.scale.x
@@ -464,6 +467,244 @@
       }
     })
   })
+
+  /*/!**
+   * Laser pointer
+   *!/
+  SWAM.on("gameRunning", function() {
+    onSettingsUpdated('laserPointer',(laserPointer) => {
+      if (laserPointer) {
+        const pointer = createRectangleSprite(
+          {
+            color: 0xFFFFFF,
+            alpha: 1,
+            width: 1,
+            height: 1000,
+            x: 0,
+            y: 0
+          })
+        pointer.rotation = Math.PI;
+        Players.getMe().sprites.sprite.addChild(pointer)
+      } else {
+
+      }
+    })
+  })*/
+
+  /**
+   * Energy/health indicator
+   */
+  SWAM.on("gameRunning",() => {
+    const settingsRef = {current: {}}
+    const createCircleCanvas = (diameter = 60, color = "#FFFFFF") => {
+      const canvas = document.createElement('canvas');
+      canvas.height = diameter
+      canvas.width = diameter
+      const ctx = canvas.getContext('2d');
+      ctx.filter = 'blur(1px)';
+      const centerY = diameter / 2;
+      const centerX = diameter / 2;
+
+      ctx.beginPath();
+
+      ctx.arc(centerX, centerY, (diameter - 2) / 2, 0, 2 * Math.PI,true);
+      ctx.lineTo(centerX, centerY);
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      ctx.closePath();
+      return canvas
+    }
+
+
+    const ENERGY_CIRCLE_DIAMETER = 45
+    const PREDATOR = 1
+    const GOLIATH = 2
+    const MOHAWK = 3
+    const TORNADO = 4
+    const PROWLER = 5
+    const PLANE_FIRE_ENERGY = {
+      [PREDATOR]: 0.55,
+      [GOLIATH]: 0.85,
+      [MOHAWK]: 1,
+      [TORNADO]: 0.45,
+      [PROWLER]: 0.7
+    }
+
+    const UPGRADES_SPECS = {
+      DEFENSE: [1, 1.05, 1.1, 1.15, 1.2, 1.25],
+      MISSILE: [1, 1.05, 1.1, 1.15, 1.2, 1.25]
+    };
+    const PROJECTILES_DAMAGE = {
+      [PREDATOR]: 0.4,
+      [GOLIATH]: 1.2,
+      [MOHAWK]: 0.2,
+      [TORNADO]: 0.42,
+      [TORNADO + 'SMALL_MISSILE']: 0.3,
+      [PROWLER]: 0.45,
+    };
+    const SHIP_DAMAGE_FACTOR = {
+      [PREDATOR]: 2,
+      [GOLIATH]: 1,
+      [MOHAWK]: 2.87,
+      [TORNADO]: 4.85 / 3.1,
+      [PROWLER]: 5 / 3
+    }
+    const SMALL_DAMAGE_GLOW = new PIXI.filters.GlowFilter(5,0,2,0xfcba03,.2)
+    const HIGH_DAMAGE_GLOW_BLUE = new PIXI.filters.GlowFilter(5,0,2,0xff0077,.2)
+    const HIGH_DAMAGE_GLOW_RED = new PIXI.filters.GlowFilter(5,0,2,0xa204db,.2)
+
+    const howManyMissilesCanHandle = (victim,type) => {
+      if (!type) { return }
+      const missileDamage = PROJECTILES_DAMAGE[type];
+      const fullAirplaneHealth =
+        (1 / SHIP_DAMAGE_FACTOR[victim.type]) *
+        UPGRADES_SPECS.DEFENSE[5];
+      const result = (fullAirplaneHealth * victim.health) / missileDamage
+      const totalMissilesCanHandle = fullAirplaneHealth / missileDamage
+      if (Math.ceil(totalMissilesCanHandle) !== Math.ceil(result)) {
+        return (fullAirplaneHealth * victim.health) / missileDamage
+      } else {
+        return 2
+      }
+    }
+
+    Players.add({type:1,id:'protoHelp'})
+    const PlayerProto = Players.get('protoHelp').constructor.prototype
+    const originalUpdateGraphics = PlayerProto.updateGraphics
+    const originalSetupGraphics = PlayerProto.setupGraphics
+    const originalDestroy = PlayerProto.destroy
+    const originalVisibilityUpdate = PlayerProto.visibilityUpdate
+    Players.destroy('protoHelp')
+
+    const CIRCLE_TEXTURE = PIXI.Texture.fromCanvas(createCircleCanvas(ENERGY_CIRCLE_DIAMETER))
+    const createProgressSprite = () => {
+      const progressSprite = new PIXI.Sprite(CIRCLE_TEXTURE)
+      progressSprite.width = ENERGY_CIRCLE_DIAMETER
+      progressSprite.height = ENERGY_CIRCLE_DIAMETER
+      return progressSprite
+    }
+    const addGlow = (p,nextGlow) => {
+      p.sprites.sprite.filters = p.sprites.sprite.filters || []
+      const lastFilter = p.sprites.sprite.filters[p.sprites.sprite.filters.length - 1]
+      const replace = lastFilter === HIGH_DAMAGE_GLOW_RED || lastFilter === HIGH_DAMAGE_GLOW_BLUE || lastFilter === SMALL_DAMAGE_GLOW
+
+      if (nextGlow !== lastFilter) {
+        if (replace) {
+          p.sprites.sprite.filters = p.sprites.sprite.filters.slice(0, -1).concat(nextGlow)
+        } else {
+          p.sprites.sprite.filters = p.sprites.sprite.filters.concat(nextGlow)
+        }
+      }
+    }
+    const removeGlow = (p) => {
+      if (!p.sprites.sprite.filters?.length) return
+      const lastFilter = p.sprites.sprite.filters[p.sprites.sprite.filters.length - 1]
+      const hasDamageGlow = lastFilter === HIGH_DAMAGE_GLOW_RED || lastFilter === HIGH_DAMAGE_GLOW_BLUE || lastFilter === SMALL_DAMAGE_GLOW
+      if (hasDamageGlow) {
+        p.sprites.sprite.filters = p.sprites.sprite.filters.slice(0, -1)
+      }
+    }
+    const updateEnergyStatus = (p) => {
+      if (!p.render) {
+        p.sprites.energy.visible = false
+        return;
+      }
+      /*if (!p.team || p.team !== Players.getMe()?.team) {
+        const missilesCanHandle = howManyMissilesCanHandle(p, Players.getMe()?.type)
+        if (missilesCanHandle < 2 && !!settingsRef.current.healthGlowStrength) {
+          addGlow(p,
+                  missilesCanHandle < 1
+                    ? (p.team === BLUE_TEAM ? HIGH_DAMAGE_GLOW_BLUE : HIGH_DAMAGE_GLOW_RED)
+                    : SMALL_DAMAGE_GLOW
+          )
+        } else {
+          removeGlow(p)
+        }
+      } else {*/
+        if (!settingsRef.current.healthGlowStrength || (!settingsRef.current.selfHealthGlow && p.id === Players.getMe()?.id)) {
+          removeGlow(p)
+        } else {
+          const mohawkMissilesCanHandle = howManyMissilesCanHandle(p, MOHAWK)
+          if (mohawkMissilesCanHandle < 1) {
+            addGlow(p, (p.team === BLUE_TEAM ? HIGH_DAMAGE_GLOW_BLUE : HIGH_DAMAGE_GLOW_RED))
+          } else {
+            const predMissilesCanHandle = howManyMissilesCanHandle(p, PREDATOR)
+            if (predMissilesCanHandle < 1) {
+              addGlow(p, SMALL_DAMAGE_GLOW)
+            } else {
+              removeGlow(p)
+            }
+          }
+        }
+      // }
+      const fireEnergy = PLANE_FIRE_ENERGY[p.type]
+      const canFirePercent = 1 - (p.energy < fireEnergy ? p.energy / fireEnergy : 1)
+      const settingsVisible = !isNaN(settingsRef.current.ENERGY_COLOR) && (!!settingsRef.current.selfEnergyCircle || p.id !== Players.getMe()?.id)
+      p.sprites.energy.visible = settingsVisible && canFirePercent > 0 && canFirePercent <= 1
+      if (p.sprites.energy.visible) {
+        Graphics.transform(p.sprites.energy, p.pos.x - (ENERGY_CIRCLE_DIAMETER * canFirePercent / 2), p.pos.y - (ENERGY_CIRCLE_DIAMETER * canFirePercent / 2), 0, canFirePercent, null, null)
+      }
+    }
+    onSettingsUpdated(['energyCircleColor','healthGlowStrength','selfEnergyCircle', 'selfHealthGlow'],
+    (settings) => {
+      const ENERGY_COLOR = parseInt(settings.energyCircleColor?.replace("#",""),16)
+      const HEALTH_STRENGTH = Number(settings.healthGlowStrength)
+      settingsRef.current = {...settings,ENERGY_COLOR,HEALTH_STRENGTH}
+      if (!isNaN(ENERGY_COLOR) || HEALTH_STRENGTH) {
+        HIGH_DAMAGE_GLOW_RED.uniforms.innerStrength = HEALTH_STRENGTH
+        HIGH_DAMAGE_GLOW_BLUE.uniforms.innerStrength = HEALTH_STRENGTH
+        SMALL_DAMAGE_GLOW.uniforms.innerStrength = HEALTH_STRENGTH
+        Object.keys(Players.getIDs()).map(Players.get).forEach(p => {
+          if (p.sprites?.energy) {
+            p.sprites.energy.tint = ENERGY_COLOR
+          }
+        })
+        PlayerProto.setupGraphics = function (isPlaneTypeChange) {
+          originalSetupGraphics.call(this, isPlaneTypeChange)
+          if (!isPlaneTypeChange && ENERGY_COLOR) {
+            const energy = createProgressSprite(ENERGY_CIRCLE_DIAMETER, 15)
+            energy.tint = ENERGY_COLOR
+            energy.alpha = 0.7
+            energy.visible = false
+            this.sprites.energy = energy
+            game.graphics.layers.powerups.addChild(energy)
+          }
+        }
+        PlayerProto.updateGraphics = function (e) {
+          originalUpdateGraphics.call(this, e)
+          updateEnergyStatus(this)
+        }
+        PlayerProto.destroy = function (fullDestroy) {
+          originalDestroy.call(this, fullDestroy)
+          if (this.sprites.energy && fullDestroy) {
+            game.graphics.layers.powerups.removeChild(this.sprites.energy)
+            this.sprites.energy.destroy()
+          }
+        }
+        PlayerProto.visibilityUpdate = function (e) {
+          originalVisibilityUpdate.call(this, e)
+          if (!this.render && this.sprites.energy) {
+            this.sprites.energy.visible = false
+          }
+        }
+      } else {
+        PlayerProto.setupGraphics = originalSetupGraphics
+        PlayerProto.updateGraphics = originalUpdateGraphics
+        PlayerProto.destroy = originalDestroy
+        PlayerProto.visibilityUpdate = originalVisibilityUpdate
+      }
+    })
+
+  })
+
+/*
+function update() {
+    progressFrameTexture.frame = new PIXI.Rectangle(radius * frame, 0, radius, radius)
+}
+
+   */
+
 
   /**
    * HitCircles missile size
@@ -1258,7 +1499,7 @@ ${redPlayers.map(player =>
     SWAM.on("CTF_MatchEnded", () => resetLeader('auto'))
     SWAM.on("gamePrep", resetLeader)
     const onPlayerChange =  ({id}) => {
-      if (id === Players.getMe().id) {
+      if (id === Players.getMe()?.id) {
         resetLeader()
       } else if (Players.getByName(currentAssisted)?.id === id) {
         resetMode('auto')
@@ -1590,6 +1831,19 @@ ${redPlayers.map(player =>
     return true;
   }
 
+  const createRectangleSprite = ({color,x,y, height,width, alpha = 0.3}) => {
+    var sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
+    sprite.tint = color; //Change with the color wanted
+    sprite.alpha = alpha;
+    sprite.width = width;
+    sprite.height = height;
+    sprite.x = x
+    sprite.y = y
+    sprite.roundPixels = true
+    return sprite
+  }
+
+
   const unescapeHTML = (text) => text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#x27;/g, "'").replace(/&#x2F;/g, "/").replace(/&#x60;/g, "`")
 
   SWAM.registerExtension({
@@ -1597,7 +1851,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.2.24",
+    version: "1.3.0",
     settingsProvider: createSettingsProvider()
   });
 
