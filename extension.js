@@ -1859,6 +1859,9 @@ ${redPlayers.map(player =>
     // airmash-refugees Zoom slider (https://github.com/airmash-refugees/airmash-frontend/)
 
   SWAM.on("gameLoaded", () => {
+    SWAM.on("settingsApplied", () => {
+      UI.updateScalingWidgetState()
+    })
     let scaleBox = null;
     let scaleKnob = null;
     let scaleIsDragging = false;
@@ -1955,6 +1958,10 @@ ${redPlayers.map(player =>
 
     UI.setScalingFactor = function(zoom) {
       config.scalingFactor = zoom
+      SWAM.Settings.general.scalingFactor = zoom
+      Tools.setSettings({
+        SWAM_Settings: SWAM.Settings
+      })
       UI.scheduleGraphicsResize(100);
     };
 
@@ -2098,7 +2105,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.3.2",
+    version: "1.3.3",
     settingsProvider: createSettingsProvider()
   });
 
