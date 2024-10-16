@@ -1,5 +1,4 @@
 !function() {
-
   let settings = {
     fixPlayerCount: true,
     respawnLines: true,
@@ -40,8 +39,9 @@
     healthGlowStrength: 2,
     selfEnergyCircle: true,
     selfHealthGlow: true,
-    othersEnergyCircle: true,
-    othersHealthGlow: true
+    othersEnergyCircle: 'all',
+    othersHealthGlow: 'all',
+    SWAMSensibleDefaults:0
   };
   const BLUE_TEAM = 1
   const RED_TEAM = 2
@@ -90,17 +90,33 @@
     });*/
 
     const planeHealthEnergySections = sp.addSection("Planes Health/Energy");
-    planeHealthEnergySections.addString("energyCircleColor", "Low energy circle when can't fire missile. Color in HEX, ex: #1F32A1 (empty to disable)")
-    planeHealthEnergySections.addBoolean("othersEnergyCircle", "Show energy circle for others");
-    planeHealthEnergySections.addBoolean("selfEnergyCircle", "Show energy circle for self");
+    planeHealthEnergySections.addBoolean("selfEnergyCircle", "Show energy circle for self (when can't fire missile)");
+    planeHealthEnergySections.addValuesField("othersEnergyCircle", "Show energy circle for others",
+                                             {
+                                               "all": "Everyone",
+                                               "team": "Only own team",
+                                               "enemy": "Only enemy team",
+                                               "carrier": "Only for flag carriers",
+                                               "none": "None"
+                                             });
+    planeHealthEnergySections.addString("energyCircleColor", "Energy circle HEX color ex: #1F32A1")
 
-    planeHealthEnergySections.addSliderField("healthGlowStrength", "Health glow strength (yellow dies to pred, red to heli, 0 to disable)", {
+
+
+    planeHealthEnergySections.addBoolean("selfHealthGlow", "Show health glow for self  (yellow dies to pred, red to heli)");
+    planeHealthEnergySections.addValuesField("othersHealthGlow", "Show health glow for others",
+                                         {
+                                           "all": "Everyone",
+                                           "team": "Only own team",
+                                           "enemy": "Only enemy team",
+                                           "carrier": "Only for flag carriers",
+                                           "none": "None"
+                                         });
+    planeHealthEnergySections.addSliderField("healthGlowStrength", "Health glow strength", {
       min:0,
       max: 5,
       step: 0.1
     })
-    planeHealthEnergySections.addBoolean("othersHealthGlow", "Show health glow for others");
-    planeHealthEnergySections.addBoolean("selfHealthGlow", "Show health glow for self");
 
 
 
@@ -503,6 +519,14 @@
    */
   SWAM.on("gameRunning",() => {
     const settingsRef = {current: {}}
+
+    const carrierInfo = {
+      [RED_TEAM]: {player:null,team:RED_TEAM},
+      [BLUE_TEAM]: {player:null,team:BLUE_TEAM}
+    }
+    SWAM.on("carrierInfo", (info) => {
+      carrierInfo[info.team] = info
+    })
     const createCircleCanvas = (diameter = 60, color = "#FFFFFF") => {
       const canvas = document.createElement('canvas');
       canvas.height = diameter
@@ -617,7 +641,9 @@
         p.sprites.energy.visible = false
         return;
       }
-      const playerIsMe = p.id !== Players.getMe()?.id
+      const playerIsMe = p.id === Players.getMe()?.id
+      const sameTeam = p.team === Players.getMe()?.team
+      const isCarrier = p.id === carrierInfo[BLUE_TEAM]?.player?.id || p.id === carrierInfo[RED_TEAM]?.player?.id
       /*if (!p.team || p.team !== Players.getMe()?.team) {
         const missilesCanHandle = howManyMissilesCanHandle(p, Players.getMe()?.type)
         if (missilesCanHandle < 2 && !!settingsRef.current.healthGlowStrength) {
@@ -632,7 +658,10 @@
       } else {*/
         if (!settingsRef.current.healthGlowStrength ||
           (!settingsRef.current.selfHealthGlow && playerIsMe) ||
-          (!settingsRef.current.othersHealthGlow && !playerIsMe)
+          (settingsRef.current.othersHealthGlow === 'team' && !sameTeam) ||
+          (settingsRef.current.othersHealthGlow === 'enemy' && sameTeam && !playerIsMe) ||
+          (settingsRef.current.othersHealthGlow === 'carrier' && !isCarrier && !playerIsMe) ||
+          (settingsRef.current.othersHealthGlow === 'none' && !playerIsMe)
         ) {
           removeGlow(p)
         } else {
@@ -652,9 +681,15 @@
       const fireEnergy = PLANE_FIRE_ENERGY[p.type]
       const canFirePercent = 1 - (p.energy < fireEnergy ? p.energy / fireEnergy : 1)
       const settingsVisible =
-        !isNaN(settingsRef.current.ENERGY_COLOR)
-        && (!!settingsRef.current.selfEnergyCircle || playerIsMe)
-        && (!!settingsRef.current.othersEnergyCircle || !playerIsMe)
+        !isNaN(settingsRef.current.ENERGY_COLOR) &&
+        !(
+          (!settingsRef.current.selfEnergyCircle && playerIsMe) ||
+          (settingsRef.current.othersEnergyCircle === 'team' && !sameTeam) ||
+          (settingsRef.current.othersEnergyCircle === 'enemy' && sameTeam && !playerIsMe) ||
+          (settingsRef.current.othersEnergyCircle === 'carrier' && !isCarrier && !playerIsMe ) ||
+          (settingsRef.current.othersEnergyCircle === 'none' && !playerIsMe)
+        )
+
       p.sprites.energy.visible = settingsVisible && canFirePercent > 0 && canFirePercent <= 1
       if (p.sprites.energy.visible) {
         Graphics.transform(p.sprites.energy, p.pos.x - (ENERGY_CIRCLE_DIAMETER * canFirePercent / 2), p.pos.y - (ENERGY_CIRCLE_DIAMETER * canFirePercent / 2), 0, canFirePercent, null, null)
@@ -941,6 +976,7 @@ function update() {
       SWAM.Settings.ui.useSquaredScene = newScale.squared
       SWAM.Settings.general.scalingFactor = newScale.zoom+""
       SWAM.resizeMap(newScale.zoom)
+      UI.updateScalingWidgetState()
     }
     document.addEventListener("keydown", (e) => {
       const settings = currentSettingsRef.ref
@@ -1816,6 +1852,195 @@ ${redPlayers.map(player =>
     $("#minimizechatcontainer").prepend(mentions, pub, whisper, bots, team)
   })*/
 
+  /**
+   * Airmash-refugees zoom slider
+   */
+
+    // airmash-refugees Zoom slider (https://github.com/airmash-refugees/airmash-frontend/)
+
+  SWAM.on("gameLoaded", () => {
+    let scaleBox = null;
+    let scaleKnob = null;
+    let scaleIsDragging = false;
+    let scaleDragOffset = -1;
+    let delayedGraphicsResizeTimer = null;
+    const SCALE_MIN = 800;
+    const SCALE_MAX = 7000;
+
+
+    UI.createScaleSlider = function() {
+      scaleBox = document.createElement('div');
+      scaleBox.style.position = 'absolute';
+      scaleBox.style.width = '250px';
+      scaleBox.style.background = 'white';
+      scaleBox.style.borderRadius = '5px';
+      scaleBox.style.top = '21px';
+      scaleBox.style.left = '320px';
+      scaleBox.style.zIndex = 110;
+      scaleBox.style.height = '10px';
+      scaleBox.style.opacity = 0.07;
+
+      scaleKnob = document.createElement('div');
+      scaleKnob.style.position = 'absolute';
+      scaleKnob.style.width = '22px';
+      scaleKnob.style.background = 'white';
+      scaleKnob.style.borderRadius = '5px';
+      scaleKnob.style.top = '21px';
+      scaleKnob.style.left = '350px';
+      scaleKnob.style.zIndex = 110;
+      scaleKnob.style.height = '10px';
+      scaleKnob.style.opacity = 0.08;
+
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', 24);
+      svg.setAttribute('height', 24);
+      svg.setAttribute('viewBox', '0 0 24 24');
+
+      document.body.appendChild(scaleBox);
+      document.body.appendChild(scaleKnob);
+
+      scaleKnob.addEventListener('mousedown', UI.onScaleKnobMouseDown);
+      document.addEventListener('mousemove', UI.onScaleKnobMouseMove);
+      document.addEventListener('mouseup', UI.onScaleKnobMouseUp);
+
+      UI.updateScalingWidgetState();
+    };
+
+
+    UI.scaleIncrease = function() {
+      UI.setScalingFactor(UI.getScalingFactor() + 200);
+      UI.updateScalingWidgetState();
+    };
+
+    UI.scaleDecrease = function() {
+      UI.setScalingFactor(UI.getScalingFactor() - 200);
+      UI.updateScalingWidgetState();
+    };
+
+    UI.scaleDefault = function() {
+      UI.setScalingFactor(2500);
+      UI.updateScalingWidgetState();
+    };
+
+    UI.hideScaleSlider = function() {
+      scaleBox.style.display = 'none';
+      scaleKnob.style.display = 'none';
+    };
+
+    UI.showScaleSlider = function() {
+      scaleBox.style.display = 'block';
+      scaleKnob.style.display = 'block';
+    };
+
+    UI.onScaleKnobMouseDown = function(event) {
+      scaleIsDragging = true;
+      scaleDragOffset = event.clientX - event.target.getBoundingClientRect().left;
+    };
+
+    UI.getScalingFactor = function() {
+      return UI.capScalingFactor(config.scalingFactor)
+    };
+
+    UI.capScalingFactor = function(zoom) {
+      return Math.min(SCALE_MAX, Math.max(SCALE_MIN, zoom));
+    };
+
+    UI.scheduleGraphicsResize = function(delay) {
+      clearTimeout(delayedGraphicsResizeTimer);
+      delayedGraphicsResizeTimer = setTimeout(function()
+                                              {
+                                                SWAM.resizeMap(config.scalingFactor)
+                                              }, delay || 0);
+    };
+
+    UI.setScalingFactor = function(zoom) {
+      config.scalingFactor = zoom
+      UI.scheduleGraphicsResize(100);
+    };
+
+    UI.onScaleKnobMouseMove = function(event) {
+      if(scaleIsDragging) {
+        var minLeft = parseInt(scaleBox.style.left, 10);
+        var maxLeft = minLeft + (
+          parseInt(scaleBox.style.width, 10) -
+          parseInt(scaleKnob.style.width, 10)
+        );
+
+        var left = Math.max(
+          minLeft,
+          Math.min(
+            maxLeft,
+            event.clientX - scaleDragOffset
+          )
+        );
+        scaleKnob.style.left = left + 'px';
+        UI.setScalingFactor(SCALE_MIN + ((SCALE_MAX - SCALE_MIN) * ((left - minLeft) / (maxLeft - minLeft))));
+      }
+    };
+
+    UI.updateScalingWidgetState = function() {
+
+      var minLeft = parseInt(scaleBox.style.left, 10);
+      var maxLeft = minLeft + (
+        parseInt(scaleBox.style.width, 10) -
+        parseInt(scaleKnob.style.width, 10)
+      );
+
+      var zoom = UI.getScalingFactor();
+      var left = minLeft + ((zoom - SCALE_MIN) * ((maxLeft - minLeft) / (SCALE_MAX - SCALE_MIN)));
+      scaleKnob.style.left = left + 'px';
+    };
+
+    UI.onScaleKnobMouseUp = function(event) {
+      if(scaleIsDragging) {
+        scaleIsDragging = false;
+      }
+    };
+
+    const originalUISetup = UI.setup
+    const originalUIGameStart = UI.gameStart
+    UI.setup = () => {
+      originalUISetup()
+      UI.createScaleSlider();
+      UI.hideScaleSlider();
+    }
+    UI.gameStart = (playerName, isFirstTime) => {
+      originalUIGameStart(playerName, isFirstTime)
+      UI.showScaleSlider();
+    }
+
+  })
+
+
+  SWAM.on("gameRunning",() => {
+    //removes powerup effects and zoom slider
+    SWAM.settingsProvider.sections[0].fields.splice(0,1)
+    SWAM.settingsProvider.sections[0].fields.splice(2,1)
+
+    if (SWAM.Settings.general.powerupsFX || !SWAM.Settings.extensions.starmashthings.SWAMSensibleDefaults) {
+      // sensible defaults
+      SWAM.Settings.extensions.starmashthings.SWAMSensibleDefaults = 1
+      SWAM.Settings.general.powerupsFX = false
+      SWAM.Settings.ui.useSquaredScene = false
+      if(SWAM.Settings.general.powerupsFX) {
+        SWAM.Settings.ui.showWhoKilledWho = false
+        SWAM.Settings.ui.showLogConnections = false
+      }
+      Tools.setSettings({
+        SWAM_Settings: SWAM.Settings
+      })
+    }
+    if (typeof SWAM.Settings.extensions.starmashthings.othersEnergyCircle === 'boolean') {
+      SWAM.Settings.extensions.starmashthings.othersEnergyCircle =
+        SWAM.Settings.extensions.starmashthings.othersEnergyCircle ? 'all' : 'none'
+      SWAM.Settings.extensions.starmashthings.othersHealthGlow =
+        SWAM.Settings.extensions.starmashthings.othersHealthGlow ? 'all' : 'none'
+      Tools.setSettings({
+                          SWAM_Settings: SWAM.Settings
+                        })
+    }
+
+  })
 
   /**
    *  utils
@@ -1873,7 +2098,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.3.1",
+    version: "1.3.2",
     settingsProvider: createSettingsProvider()
   });
 
