@@ -39,7 +39,9 @@
     energyCircleColor: '#1F32A1',
     healthGlowStrength: 2,
     selfEnergyCircle: true,
-    selfHealthGlow: true
+    selfHealthGlow: true,
+    othersEnergyCircle: true,
+    othersHealthGlow: true
   };
   const BLUE_TEAM = 1
   const RED_TEAM = 2
@@ -86,15 +88,20 @@
       max: 1000,
       step: 50
     });*/
+
     const planeHealthEnergySections = sp.addSection("Planes Health/Energy");
     planeHealthEnergySections.addString("energyCircleColor", "Low energy circle when can't fire missile. Color in HEX, ex: #1F32A1 (empty to disable)")
+    planeHealthEnergySections.addBoolean("othersEnergyCircle", "Show energy circle for others");
+    planeHealthEnergySections.addBoolean("selfEnergyCircle", "Show energy circle for self");
+
     planeHealthEnergySections.addSliderField("healthGlowStrength", "Health glow strength (yellow dies to pred, red to heli, 0 to disable)", {
       min:0,
       max: 5,
       step: 0.1
     })
-    planeHealthEnergySections.addBoolean("selfEnergyCircle", "Show energy circle for self");
+    planeHealthEnergySections.addBoolean("othersHealthGlow", "Show health glow for others");
     planeHealthEnergySections.addBoolean("selfHealthGlow", "Show health glow for self");
+
 
 
     const themeSection = sp.addSection("Theme/Style");
@@ -610,6 +617,7 @@
         p.sprites.energy.visible = false
         return;
       }
+      const playerIsMe = p.id !== Players.getMe()?.id
       /*if (!p.team || p.team !== Players.getMe()?.team) {
         const missilesCanHandle = howManyMissilesCanHandle(p, Players.getMe()?.type)
         if (missilesCanHandle < 2 && !!settingsRef.current.healthGlowStrength) {
@@ -622,7 +630,10 @@
           removeGlow(p)
         }
       } else {*/
-        if (!settingsRef.current.healthGlowStrength || (!settingsRef.current.selfHealthGlow && p.id === Players.getMe()?.id)) {
+        if (!settingsRef.current.healthGlowStrength ||
+          (!settingsRef.current.selfHealthGlow && playerIsMe) ||
+          (!settingsRef.current.othersHealthGlow && !playerIsMe)
+        ) {
           removeGlow(p)
         } else {
           const mohawkMissilesCanHandle = howManyMissilesCanHandle(p, MOHAWK)
@@ -640,13 +651,16 @@
       // }
       const fireEnergy = PLANE_FIRE_ENERGY[p.type]
       const canFirePercent = 1 - (p.energy < fireEnergy ? p.energy / fireEnergy : 1)
-      const settingsVisible = !isNaN(settingsRef.current.ENERGY_COLOR) && (!!settingsRef.current.selfEnergyCircle || p.id !== Players.getMe()?.id)
+      const settingsVisible =
+        !isNaN(settingsRef.current.ENERGY_COLOR)
+        && (!!settingsRef.current.selfEnergyCircle || playerIsMe)
+        && (!!settingsRef.current.othersEnergyCircle || !playerIsMe)
       p.sprites.energy.visible = settingsVisible && canFirePercent > 0 && canFirePercent <= 1
       if (p.sprites.energy.visible) {
         Graphics.transform(p.sprites.energy, p.pos.x - (ENERGY_CIRCLE_DIAMETER * canFirePercent / 2), p.pos.y - (ENERGY_CIRCLE_DIAMETER * canFirePercent / 2), 0, canFirePercent, null, null)
       }
     }
-    onSettingsUpdated(['energyCircleColor','healthGlowStrength','selfEnergyCircle', 'selfHealthGlow'],
+    onSettingsUpdated(['energyCircleColor','healthGlowStrength','selfEnergyCircle', 'selfHealthGlow','othersEnergyCircle', 'othersHealthGlow'],
     (settings) => {
       const ENERGY_COLOR = parseInt(settings.energyCircleColor?.replace("#",""),16)
       const HEALTH_STRENGTH = Number(settings.healthGlowStrength)
@@ -884,6 +898,14 @@ function update() {
           const redTeam = players.filter(({team}) => team === RED_TEAM)
           return [blueTeam.filter(({distance,id}) => distance < 3500 && id !== player.id), redTeam.filter(({distance,id}) => distance < 3500 && id !== player.id)]
         }
+        const planesNearHtml = (planesClose,team) => {
+          const botsClose = planesClose.filter(isBot)
+          const subColor = team === 1 ? "#26cae0" : "#e07d26"
+          return `<span>${planesClose.length - botsClose.length}</span>${
+            botsClose.length
+            ? `<span style="font-size: 10px;color:${subColor};">+${botsClose.length}</span>`
+            : ``}`
+        }
         UI.scoreboardUpdate = (t,n,i) => {
           originalUIscoreboardUpdate(t,n,i)
           if (game.gameType == SWAM.GAME_TYPE.CTF) {
@@ -891,14 +913,14 @@ function update() {
               if (blueCarrier) {
                 const [bluesClose, redsClose] = getCloseToCarrier(Players.get(blueCarrier))
                 SWAM.trigger("carrierInfo",{plane:Players.get(blueCarrier).type,player:Players.get(blueCarrier),team: BLUE_TEAM,reds:redsClose,blues:bluesClose,hasCount:true})
-                document.getElementById("blueflag-name").querySelector(".blues-close").innerText = ` ${bluesClose?.length} `
-                document.getElementById("blueflag-name").querySelector(".reds-close").innerText = ` ${redsClose?.length} `
+                $("#blueflag-name .blues-close").html(planesNearHtml(bluesClose,BLUE_TEAM))
+                $("#blueflag-name .reds-close").html(planesNearHtml(redsClose,RED_TEAM))
               }
               if (redCarrier) {
                 const [bluesClose, redsClose] = getCloseToCarrier(Players.get(redCarrier))
                 SWAM.trigger("carrierInfo",{plane:Players.get(redCarrier).type,player:Players.get(redCarrier),team:RED_TEAM,reds:redsClose,blues:bluesClose,hasCount:true})
-                document.getElementById("redflag-name").querySelector(".blues-close").innerText = ` ${bluesClose?.length} `
-                document.getElementById("redflag-name").querySelector(".reds-close").innerText = ` ${redsClose?.length} `
+                $("#redflag-name .blues-close").html(planesNearHtml(bluesClose,BLUE_TEAM))
+                $("#redflag-name .reds-close").html(planesNearHtml(redsClose,RED_TEAM))
               }
             }
           }
@@ -1851,7 +1873,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.3.0",
+    version: "1.3.1",
     settingsProvider: createSettingsProvider()
   });
 
