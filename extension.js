@@ -2023,7 +2023,11 @@ ${redPlayers.map(player =>
     //removes powerup effects and zoom slider
     SWAM.settingsProvider.sections[0].fields.splice(0,1)
     SWAM.settingsProvider.sections[0].fields.splice(2,1)
-
+    const originalUIAddPowerup = UI.addPowerup
+    UI.addPowerup = function(Bt, Gt) {
+      SWAM.Settings.general.powerupsFX = false
+      originalUIAddPowerup.call(UI, Bt, Gt);
+    }
     if (SWAM.Settings.general.powerupsFX || !SWAM.Settings.extensions.starmashthings.SWAMSensibleDefaults) {
       // sensible defaults
       SWAM.Settings.extensions.starmashthings.SWAMSensibleDefaults = 1
@@ -2105,7 +2109,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.3.3",
+    version: "1.3.4",
     settingsProvider: createSettingsProvider()
   });
 
