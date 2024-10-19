@@ -1473,6 +1473,12 @@ ${redPlayers.map(player =>
     let lastAssistLine = '';
 
     SWAM.on("chatLineAdded",(player,text,type) => {
+      if (text?.toUpperCase() === "-RADAR-PING") {
+        if (SWAM.Settings.general.useProwlerRadar && player.id !== Players.getMe().id) {
+          Network.sendWhisper(player.id, `-RADAR-PONG`)
+        }
+        return;
+      }
       if (text.indexOf("#assist")>=0) {
         lastCommandLinePlayer = player
         lastAssistLine = unescapeHTML(text);
@@ -2109,7 +2115,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.3.4",
+    version: "1.3.5",
     settingsProvider: createSettingsProvider()
   });
 
