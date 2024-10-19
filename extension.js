@@ -2057,6 +2057,31 @@ ${redPlayers.map(player =>
                         })
     }
 
+  });
+
+  /**
+   * Fix landing screen
+   */
+  SWAM.on("gameLoaded",function() {
+    const originalJqueryAjax = $.ajax
+    $.ajax = function (opts,...args) {
+      if (opts?.url?.indexOf(game.serviceUrls.games)===0) {
+        return originalJqueryAjax.call(this,{
+          ...opts,
+          success:(response) => {
+            const dataWithBots = JSON.parse(response.data)
+            const data = dataWithBots.map(region => ({...region,games: region.games
+              .filter(game => !isNaN(game.players))
+              .map(game => console.log(game) ||  ({
+                ...game,
+                players: (game.players - (game.bots || 0))
+              }))}))
+            opts.success({...response,data:JSON.stringify(data)})
+          }
+        },...args)
+      }
+      return originalJqueryAjax.call(this,opts,...args)
+    }
   })
 
   /**
@@ -2115,7 +2140,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.3.5",
+    version: "1.3.6",
     settingsProvider: createSettingsProvider()
   });
 
