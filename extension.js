@@ -40,6 +40,7 @@
     selfEnergyCircle: true,
     selfHealthGlow: true,
     othersEnergyCircle: 'all',
+    energyCircleOnlyTornsAndGolis: true,
     othersHealthGlow: 'all',
     SWAMSensibleDefaults:0
   };
@@ -91,6 +92,7 @@
 
     const planeHealthEnergySections = sp.addSection("Planes Health/Energy");
     planeHealthEnergySections.addBoolean("selfEnergyCircle", "Show energy circle for self (when can't fire missile)");
+    planeHealthEnergySections.addBoolean("energyCircleOnlyTornsAndGolis", "Energy circle only for torns and golis");
     planeHealthEnergySections.addValuesField("othersEnergyCircle", "Show energy circle for others",
                                              {
                                                "all": "Everyone",
@@ -669,7 +671,7 @@
           if (mohawkMissilesCanHandle < 1) {
             addGlow(p, (p.team === BLUE_TEAM ? HIGH_DAMAGE_GLOW_BLUE : HIGH_DAMAGE_GLOW_RED))
           } else {
-            const predMissilesCanHandle = howManyMissilesCanHandle(p, PREDATOR)
+            const predMissilesCanHandle = howManyMissilesCanHandle(p, Players.getMe()?.type === PROWLER ? PROWLER : PREDATOR)
             if (predMissilesCanHandle < 1) {
               addGlow(p, SMALL_DAMAGE_GLOW)
             } else {
@@ -682,6 +684,7 @@
       const canFirePercent = 1 - (p.energy < fireEnergy ? p.energy / fireEnergy : 1)
       const settingsVisible =
         !isNaN(settingsRef.current.ENERGY_COLOR) &&
+        (!settingsRef.current.energyCircleOnlyTornsAndGolis || [TORNADO, GOLIATH].includes(p.type) || playerIsMe) &&
         !(
           (!settingsRef.current.selfEnergyCircle && playerIsMe) ||
           (settingsRef.current.othersEnergyCircle === 'team' && !sameTeam) ||
@@ -695,7 +698,7 @@
         Graphics.transform(p.sprites.energy, p.pos.x - (ENERGY_CIRCLE_DIAMETER * canFirePercent / 2), p.pos.y - (ENERGY_CIRCLE_DIAMETER * canFirePercent / 2), 0, canFirePercent, null, null)
       }
     }
-    onSettingsUpdated(['energyCircleColor','healthGlowStrength','selfEnergyCircle', 'selfHealthGlow','othersEnergyCircle', 'othersHealthGlow'],
+    onSettingsUpdated(['energyCircleColor','healthGlowStrength','selfEnergyCircle', 'selfHealthGlow','othersEnergyCircle', 'othersHealthGlow','energyCircleOnlyTornsAndGolis'],
     (settings) => {
       const ENERGY_COLOR = parseInt(settings.energyCircleColor?.replace("#",""),16)
       const HEALTH_STRENGTH = Number(settings.healthGlowStrength)
@@ -2072,7 +2075,7 @@ ${redPlayers.map(player =>
             const dataWithBots = JSON.parse(response.data)
             const data = dataWithBots.map(region => ({...region,games: region.games
               .filter(game => !isNaN(game.players))
-              .map(game => console.log(game) ||  ({
+              .map(game => ({
                 ...game,
                 players: (game.players - (game.bots || 0))
               }))}))
@@ -2140,7 +2143,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.3.6",
+    version: "1.3.7",
     settingsProvider: createSettingsProvider()
   });
 
