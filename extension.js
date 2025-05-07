@@ -2138,12 +2138,24 @@ ${redPlayers.map(player =>
 
   const unescapeHTML = (text) => text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#x27;/g, "'").replace(/&#x2F;/g, "/").replace(/&#x60;/g, "`")
 
+  // fix theme CDN
+  SWAM.on("themeLoaded", () => {
+    const originalInjectTextures = SWAM.Theme.injectTextures
+    SWAM.Theme.injectTextures = (...args) => {
+      originalInjectTextures.bind(SWAM.Theme)(...args)
+      const textureMap = args[0]
+      for (let key in textureMap) {
+        textureMap[key] = typeof textureMap[key] === "string" ? textureMap[key].replace("https://raw.githubusercontent.com/","https://cdn.statically.io/gh/") : null
+      }
+    }
+  })
+  
   SWAM.registerExtension({
     name: "Starmash*",
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.3.7",
+    version: "1.3.8",
     settingsProvider: createSettingsProvider()
   });
 
