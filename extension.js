@@ -3,7 +3,8 @@
     fixPlayerCount: true,
     respawnLines: true,
     respawnLinesMinimap: true,
-    fixHud: true,
+    fixHud: false,
+    extendMapEdges: true,
     selfMinimapDot: false,
     keepFiringWhileTyping:false,
     carrier: 'count',
@@ -78,7 +79,8 @@
   {
     const sp = new SettingsProvider(settings, settingsApplied);
     const miscSection = sp.addSection("Miscellaneous");
-    miscSection.addBoolean("fixHud", "Fix HUD on map edge (needs page reload)");
+    miscSection.addBoolean("extendMapEdges", "Extend Map Edges (will keep your plane on the center of screen)");
+    miscSection.addBoolean("fixHud", "Fix HUD on map edge (needs page reload, not needed if above is enabled)");
     miscSection.addBoolean("keepFiringWhileTyping", "Keep firing while typing (except stealthed prowler)");
     miscSection.addBoolean("botsColor", "Bots have different color on minimap");
     miscSection.addBoolean("addPlaneTypeToScoreboard", "Add player plane type on scoreboard");
@@ -484,7 +486,7 @@
     const originalMinimapBoxTexture = game.graphics.gui.minimap_box.texture
     onSettingsUpdated('selfMinimapDot',(selfMinimapDot) => {
       if (selfMinimapDot) {
-        const mozBaseTexture = new PIXI.Texture.fromImage("https://raw.githubusercontent.com/fabiospampinato/airmash-swam-extensions/master/themes/hit_circles/assets/gui.png");
+        const mozBaseTexture = new PIXI.Texture.fromImage("https://cdn.statically.io/gh/fabiospampinato/airmash-swam-extensions/master/themes/hit_circles/assets/gui.png");
         const minimapBoxTexture = new PIXI.Texture(mozBaseTexture.baseTexture, new PIXI.Rectangle(268, 404, 64, 64));
         game.graphics.gui.minimap_box.texture = minimapBoxTexture
       } else {
@@ -761,43 +763,12 @@ function update() {
   /**
    * HitCircles missile size
    */
-  SWAM.on("gameRunning", function() {
-    const MissilePathTexture = (function createMissilePointerTexture() {
-      const width = 1;  // Width of the rectangle
-      const height = 500; // Height of the rectangle
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      const gradient = ctx.createLinearGradient(0, 0, 0, height);
-      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)'); // White
-      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)'); // Transparent
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, width, height);
-      return PIXI.Texture.from(canvas);
-    })()
-
-
+  SWAM.on("gameRunning", async function() {
     let missileSizeRef = {current: 100}
     let missilePathRef = {current: 0}
     const originalMobScaler = SWAM.Theme?._getMobScale
 
     const deferredUpdateMissileSize = ( ...args ) => setTimeout ( () => updateMissileSize( ...args ) )
-    const addMissilePath = (mob,player) => {
-      if (!missilePathRef.current) return
-      const missilePath = new PIXI.Sprite(MissilePathTexture);
-      missilePath.rotation = Math.PI;
-      const w = 2 / game.graphics.layers.groundobjects.scale.x
-      missilePath.x = w/2
-      missilePath.width = w
-      missilePath.height = 500
-      missilePath.alpha = 0.3
-      if (SWAM.Theme?._getThrusterTint) {
-        missilePath.tint = SWAM.Theme._getThrusterTint(player)
-      }
-      game.graphics.layers.projectiles.addChild(missilePath)
-      return missilePath
-    }
 
     const getMobScale = (mob) => {
       const missileSizeMultiplier = missileSizeRef.current / 100
@@ -809,40 +780,13 @@ function update() {
           : [.2 * missileSizeMultiplier, .15 * missileSizeMultiplier];
     }
 
-    const updateMissilePointerGraphics = () => {
-
-    }
 
     const updateMissileSize = (data,ex,playerId) => {
       let mob = Mobs.get ( data.id );
-      let player = Players.get ( playerId );
       if ( !mob ) return;
       if ( ![ 1, 2, 3, 5, 6, 7 ].includes ( mob.type ) ) return;
-      /*if (missilePathRef.current > 0) {
-        mob.originalPos = mob.pos;
-        if (mob.constructor.prototype.updateGraphics !== updateMissilePointerGraphics) {
-          const originalUpdateGraphics = mob.constructor.prototype.updateGraphics
-          const originalDestroy = mob.constructor.prototype.destroy
-          mob.constructor.prototype.updateGraphics = function() {
-            originalUpdateGraphics.call(this)
-            if ( ![ 1, 2, 3, 5, 6, 7 ].includes ( this.type ) ) return;
-            if (this.missilePath) {
-
-            }
-          }
-          mob.constructor.prototype.destroy = function(msg) {
-            originalDestroy.call(this,msg)
-            if (this.missilePath) {
-              game.graphics.layers.projectiles.removeChild(this.missilePath)
-            }
-          }
-        }
-        mob.missilePath = addMissilePath(mob, player)
-      }*/
 
       const scale = getMobScale ( mob )
-      // mob.sprites.thruster.scale.set( ...scale );
-      // mob.sprites.thrusterGlow.scale.set( ...scale );
       mob.sprites.shadow.scale.set( ...scale );
       if (SWAM.Theme?._getMobScale && game.gameType === 2) return;
       mob.sprites.sprite.scale.set( ...scale );
@@ -1768,6 +1712,48 @@ ${redPlayers.map(player =>
   })
 
 
+
+  /**
+   * FIX MAP ENDS
+   */
+  SWAM.on("gameRunning", () => {
+    const originalGraphicsSetCamera = Graphics.setCamera
+    const borderWest = createRectangleSprite({color:0xFFFFFF, x:(-config.mapWidth/2)-100,y:-config.mapHeight/2, height:config.mapHeight,width:100})
+    const borderEast = createRectangleSprite({color:0xFFFFFF, x:(config.mapWidth/2)+100,y:-config.mapHeight/2, height:config.mapHeight,width:100})
+    const borderNorth = createRectangleSprite({color:0xFFFFFF, x:-config.mapWidth/2,y:(-config.mapHeight/2)-100, height:100,width:config.mapWidth})
+    const borderSouth = createRectangleSprite({color:0xFFFFFF, x:-config.mapWidth/2,y:(config.mapHeight/2)+100, height:100,width:config.mapWidth})
+    onSettingsUpdated('extendMapEdges',(extendMapEdges) => {
+      if (extendMapEdges) {
+        Graphics.setCamera = originalGraphicsSetCamera
+        Graphics.setCamera = function (e, n) {
+          const originalGameHalfScreenX =  game.halfScreenX
+          const originalGameHalfScreenY = game.halfScreenY
+          game.halfScreenX = 0
+          game.halfScreenY = 0
+          originalGraphicsSetCamera(e, n);
+          game.halfScreenY = originalGameHalfScreenY
+          game.halfScreenX = originalGameHalfScreenX
+        };
+        if (SWAM.Theme.constructor.name === "HitCirclesGridTheme") {
+          game.graphics.layers.groundobjects.addChild(borderEast)
+          game.graphics.layers.groundobjects.addChild(borderWest)
+          game.graphics.layers.groundobjects.addChild(borderNorth)
+          game.graphics.layers.groundobjects.addChild(borderSouth)
+          SWAM.on("rendererResized", onRenderResized)
+        }
+      } else {
+        game.graphics.layers.groundobjects.removeChild(borderWest)
+        game.graphics.layers.groundobjects.removeChild(borderEast)
+        game.graphics.layers.groundobjects.removeChild(borderNorth)
+        game.graphics.layers.groundobjects.removeChild(borderSouth)
+        Graphics.setCamera = originalGraphicsSetCamera
+      }
+    })
+
+  })
+
+
+
   /**
    * Save chat size
    */
@@ -2135,27 +2121,30 @@ ${redPlayers.map(player =>
     return sprite
   }
 
-
-  const unescapeHTML = (text) => text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#x27;/g, "'").replace(/&#x2F;/g, "/").replace(/&#x60;/g, "`")
-
-  // fix theme CDN
   SWAM.on("themeLoaded", () => {
     const originalInjectTextures = SWAM.Theme.injectTextures
     SWAM.Theme.injectTextures = (...args) => {
       originalInjectTextures.bind(SWAM.Theme)(...args)
       const textureMap = args[0]
       for (let key in textureMap) {
-        textureMap[key] = typeof textureMap[key] === "string" ? textureMap[key].replace("https://raw.githubusercontent.com/","https://cdn.statically.io/gh/") : null
+        textureMap[key] = typeof textureMap[key] === "string" ? textureMap[key].replace("https://raw.githubusercontent.com/","https://cdn.statically.io/gh/")
+            .replace("hit_circles/assets/map_forest_grid.jpg","hit_circles/assets/map_forest_grid.png")
+            .replace("hit_circles/assets/map_sea_mask_grid.png","hit_circles/assets/map_sea_mask_grid.jpg")
+          : null
       }
     }
   })
-  
+
+
+
+  const unescapeHTML = (text) => text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#x27;/g, "'").replace(/&#x2F;/g, "/").replace(/&#x60;/g, "`")
+
   SWAM.registerExtension({
     name: "Starmash*",
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.3.8",
+    version: "1.3.9",
     settingsProvider: createSettingsProvider()
   });
 
