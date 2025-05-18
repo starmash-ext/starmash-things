@@ -1718,10 +1718,11 @@ ${redPlayers.map(player =>
    */
   SWAM.on("gameRunning", () => {
     const originalGraphicsSetCamera = Graphics.setCamera
-    const borderWest = createRectangleSprite({color:0xFFFFFF, x:(-config.mapWidth/2)-100,y:-config.mapHeight/2, height:config.mapHeight,width:100})
-    const borderEast = createRectangleSprite({color:0xFFFFFF, x:(config.mapWidth/2),y:-config.mapHeight/2, height:config.mapHeight,width:100})
-    const borderNorth = createRectangleSprite({color:0xFFFFFF, x:-config.mapWidth/2,y:(-config.mapHeight/2)-100, height:100,width:config.mapWidth})
-    const borderSouth = createRectangleSprite({color:0xFFFFFF, x:-config.mapWidth/2,y:(config.mapHeight/2), height:100,width:config.mapWidth})
+    const BORDER_SIZE = 100
+    const borderWest = createRectangleSprite({color:0xFFFFFF, x:(-config.mapWidth/2)-BORDER_SIZE,y:-(config.mapHeight/2)-BORDER_SIZE, height:config.mapHeight+(BORDER_SIZE*2),width:BORDER_SIZE})
+    const borderEast = createRectangleSprite({color:0xFFFFFF, x:(config.mapWidth/2),y:-(config.mapHeight/2)-BORDER_SIZE, height:config.mapHeight+(BORDER_SIZE*2),width:BORDER_SIZE})
+    const borderNorth = createRectangleSprite({color:0xFFFFFF, x:-(config.mapWidth/2)-BORDER_SIZE,y:-(config.mapHeight/2)-BORDER_SIZE, height:BORDER_SIZE,width:config.mapWidth+(BORDER_SIZE*2)})
+    const borderSouth = createRectangleSprite({color:0xFFFFFF, x:-(config.mapWidth/2)-BORDER_SIZE,y:(config.mapHeight/2), height:BORDER_SIZE,width:config.mapWidth+(BORDER_SIZE*2)})
     onSettingsUpdated('extendMapEdges',(extendMapEdges) => {
       if (extendMapEdges) {
         Graphics.setCamera = originalGraphicsSetCamera
@@ -1734,13 +1735,12 @@ ${redPlayers.map(player =>
           game.halfScreenY = originalGameHalfScreenY
           game.halfScreenX = originalGameHalfScreenX
         };
-        if (SWAM.Theme.constructor.name === "HitCirclesGridTheme") {
+        // if (SWAM.Theme.constructor.name === "HitCirclesGridTheme") {
           game.graphics.layers.groundobjects.addChild(borderEast)
           game.graphics.layers.groundobjects.addChild(borderWest)
           game.graphics.layers.groundobjects.addChild(borderNorth)
           game.graphics.layers.groundobjects.addChild(borderSouth)
-          SWAM.on("rendererResized", onRenderResized)
-        }
+        // }
       } else {
         game.graphics.layers.groundobjects.removeChild(borderWest)
         game.graphics.layers.groundobjects.removeChild(borderEast)
@@ -2144,7 +2144,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.3.10",
+    version: "1.3.11",
     settingsProvider: createSettingsProvider()
   });
 
