@@ -1719,9 +1719,9 @@ ${redPlayers.map(player =>
   SWAM.on("gameRunning", () => {
     const originalGraphicsSetCamera = Graphics.setCamera
     const borderWest = createRectangleSprite({color:0xFFFFFF, x:(-config.mapWidth/2)-100,y:-config.mapHeight/2, height:config.mapHeight,width:100})
-    const borderEast = createRectangleSprite({color:0xFFFFFF, x:(config.mapWidth/2)+100,y:-config.mapHeight/2, height:config.mapHeight,width:100})
+    const borderEast = createRectangleSprite({color:0xFFFFFF, x:(config.mapWidth/2),y:-config.mapHeight/2, height:config.mapHeight,width:100})
     const borderNorth = createRectangleSprite({color:0xFFFFFF, x:-config.mapWidth/2,y:(-config.mapHeight/2)-100, height:100,width:config.mapWidth})
-    const borderSouth = createRectangleSprite({color:0xFFFFFF, x:-config.mapWidth/2,y:(config.mapHeight/2)+100, height:100,width:config.mapWidth})
+    const borderSouth = createRectangleSprite({color:0xFFFFFF, x:-config.mapWidth/2,y:(config.mapHeight/2), height:100,width:config.mapWidth})
     onSettingsUpdated('extendMapEdges',(extendMapEdges) => {
       if (extendMapEdges) {
         Graphics.setCamera = originalGraphicsSetCamera
@@ -2144,7 +2144,7 @@ ${redPlayers.map(player =>
     id: "starmashthings",
     description: "De* collection of Starmash features (see Mod Settings)",
     author: "Debug",
-    version: "1.3.9",
+    version: "1.3.10",
     settingsProvider: createSettingsProvider()
   });
 
